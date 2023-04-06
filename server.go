@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net"
+	"strings"
 )
 
 type Server struct {
@@ -17,7 +18,7 @@ func NewServer(reqChan chan *Request) *Server {
 	}
 }
 
-func (s *Server)  Serve() {
+func (svr *Server)  Serve() {
 	ln, err := net.Listen("tcp", ":8888")
 	if err != nil {
 		panic(err)
@@ -25,23 +26,27 @@ func (s *Server)  Serve() {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Printf("Error accepting connection: %s", err)
+			log.Printf("Error accepting connection: %svr", err)
 			continue
 		}
-		s.conns = append(s.conns, conn)
-		go s.handleConnection(conn)
+		svr.conns = append(svr.conns, conn)
+		go svr.handleConnection(conn)
 	}
 }
 
-func (s *Server) handleConnection(conn net.Conn) {
-	log.Printf("Got a connection from %s", conn.RemoteAddr())
+func (svr *Server) handleConnection(conn net.Conn) {
+	log.Printf("Got a connection from %svr", conn.RemoteAddr())
 	b := make([]byte, 100)
 	for {
-		_, err := conn.Read(b)
+		n, err := conn.Read(b)
 		if err != nil {
-			log.Printf("Got a read error: %s", err)
+			log.Printf("Got actor read error: %svr", err)
+			continue
 		}
-		r := NewRequest(conn, string(b))
-		s.reqChan <- r
+		// TODO: for now using IP address, not sure what should really be done here
+		actor := NewActor(conn.RemoteAddr().String())
+		txt := strings.TrimSpace(string(b[:n]))
+		req := NewRequest(actor, conn, txt)
+		svr.reqChan <- req
 	}
 }
