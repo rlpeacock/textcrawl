@@ -8,17 +8,17 @@ import (
 
 type Server struct {
 	reqChan chan *Request
-	conns []net.Conn
+	conns   []net.Conn
 }
 
 func NewServer(reqChan chan *Request) *Server {
-	return &Server {
+	return &Server{
 		reqChan: reqChan,
-		conns: make([]net.Conn, 0),
+		conns:   make([]net.Conn, 0),
 	}
 }
 
-func (svr *Server)  Serve() {
+func (svr *Server) Serve() {
 	ln, err := net.Listen("tcp", ":8888")
 	if err != nil {
 		panic(err)

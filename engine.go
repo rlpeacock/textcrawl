@@ -13,53 +13,43 @@ import (
 // one by one. After all events are processed, it will generate responses
 // and send them to a channel that the reader thread is selecting on
 
-type Actor struct {
-	Id string
-}
-
-func NewActor(id string) *Actor {
-	return &Actor{
-		Id: id,
-	}
-}
-
 type Request struct {
 	Writer io.Writer
-	Text string
-	Actor *Actor
+	Text   string
+	Actor  *Actor
 }
 
 func NewRequest(actor *Actor, writer io.Writer, text string) *Request {
 	return &Request{
-		Actor: actor,
+		Actor:  actor,
 		Writer: writer,
-		Text: text,
+		Text:   text,
 	}
 }
 
 type Heartbeat struct {
 	tick int
-	cmd string
+	cmd  string
 }
 
 func newHeartbeat(tick int, cmd string) *Heartbeat {
 	return &Heartbeat{
 		tick: tick,
-		cmd: cmd,
+		cmd:  cmd,
 	}
 }
 
 type Engine struct {
 	RequestCh   chan *Request
 	HeartbeatCh chan *Heartbeat
-	reqsByActor map[string][]*Request
+	reqsByActor map[Id][]*Request
 }
 
 func NewEngine() *Engine {
 	return &Engine{
 		RequestCh:   make(chan *Request, 0),
 		HeartbeatCh: make(chan *Heartbeat, 0),
-		reqsByActor: make(map[string][]*Request),
+		reqsByActor: make(map[Id][]*Request),
 	}
 }
 
@@ -69,7 +59,7 @@ func (e *Engine) Run() {
 		case req := <-e.RequestCh:
 			q := e.reqsByActor[req.Actor.Id]
 			if q == nil {
-				q = []*Request{req }
+				q = []*Request{req}
 			} else {
 				q = append(q, req)
 			}
@@ -115,7 +105,7 @@ func heartbeat(c chan *Heartbeat) {
 		c <- hb
 		time.Sleep(1 * time.Second)
 	}
-	
+
 }
 
 func main() {
