@@ -53,6 +53,10 @@ func NewEngine() *Engine {
 	}
 }
 
+// We queue up requests for each actor. When we receive a
+// heartbeat message, we process the events we've received.
+// Generally this means taking the first message from each
+// actor.
 func (e *Engine) Run() {
 	for {
 		select {
@@ -73,10 +77,10 @@ func (e *Engine) Run() {
 	}
 }
 
-// Take the first unprocessed request we have from each actor.
 func (e *Engine) processRequests(hb *Heartbeat) {
 	log.Printf("tick %d", hb.tick)
 	todo := make([]*Request, 0)
+	// Take the first unprocessed request we have from each actor.
 	for id, q := range e.reqsByActor {
 		todo = append(todo, q[0])
 		q = q[1:]
@@ -86,6 +90,8 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 			e.reqsByActor[id] = q
 		}
 	}
+	// Go through and handle each request. TODO: we should order these
+	// by init value and account for multi-tick actions.
 	for _, req := range todo {
 		t := fmt.Sprintf("processing: %s (%d)\r\n", req.Text, hb.tick)
 		req.Writer.Write([]byte(t))
