@@ -25,8 +25,8 @@ type Room struct {
 	Exits     []*Exit
 }
 
-func LoadSampleRooms() (map[string]*Room, error) {
-	rooms := make(map[string]*Room, 0)
+func LoadSampleRooms() (map[Id]*Room, error) {
+	rooms := make(map[Id]*Room, 0)
 	err := yaml.Unmarshal([]byte(sample_rooms), &rooms)
 	if err != nil {
 		return nil, err

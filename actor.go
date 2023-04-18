@@ -1,5 +1,28 @@
 package main
 
+type LoginFlowState int
+
+const (
+	NOT_STARTED = iota
+	WAITING_FOR_USERNAME
+	WAITING_FOR_PASSWORD
+	BAD_LOGIN_INFO
+	MAX_FAILURES
+	LOGIN_COMPLETE
+)
+
+type Player struct {
+	LoginState LoginFlowState
+	LoginAttempts int
+	Username string
+}
+
+func NewPlayer() *Player {
+	return &Player {
+		LoginState: NOT_STARTED,
+	}
+}
+
 type Attrib struct {
 	Real int
 	Cur  int
@@ -23,10 +46,12 @@ type Actor struct {
 	Stats *Stats
 	Room  *Room
 	Inv   *Inventory
+	Player *Player
 }
 
-func NewActor(id string) *Actor {
+func NewActor(id string, player *Player) *Actor {
 	return &Actor{
 		Id: Id(id),
+		Player: player,
 	}
 }

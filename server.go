@@ -36,6 +36,8 @@ func (svr *Server) Serve() {
 
 func (svr *Server) handleConnection(conn net.Conn) {
 	log.Printf("Got a connection from %svr", conn.RemoteAddr())
+	// TODO: for now using IP address, not sure what should really be done here
+	actor := NewActor(conn.RemoteAddr().String(), NewPlayer())
 	b := make([]byte, 100)
 	for {
 		n, err := conn.Read(b)
@@ -43,8 +45,6 @@ func (svr *Server) handleConnection(conn net.Conn) {
 			log.Printf("Got actor read error: %svr", err)
 			continue
 		}
-		// TODO: for now using IP address, not sure what should really be done here
-		actor := NewActor(conn.RemoteAddr().String())
 		txt := strings.TrimSpace(string(b[:n]))
 		req := NewRequest(actor, conn, txt)
 		svr.reqChan <- req

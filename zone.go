@@ -8,16 +8,38 @@ package main
 // IPC failure.
 
 type Zone struct {
-	Rooms map[Id]*Room	
+	Rooms map[Id]*Room
 }
 
-func NewZone(id Id) *Zone {
+func NewZone(id Id) (*Zone, error) {
 	rooms := make(map[Id]*Room)
-	samples := SampleRooms()
-	for _, s := range(samples) {
-		rooms[s.Id] = s
+	rooms, err := LoadSampleRooms()
+	if err != nil {
+		return nil, err
 	}
 	return &Zone{
-		Rooms: rooms,	
+		Rooms: rooms,
+	}, nil
+}
+
+type ZoneManager struct {
+	zones map[Id]*Zone
+}
+
+func GetZoneMgr() *ZoneManager {
+	return &ZoneManager{
+		zones: make(map[Id]*Zone),
 	}
+}
+
+func (zm *ZoneManager) GetZone(id Id) (*Zone, error) {
+	z := zm.zones[id]
+	if z == nil {
+		z, err := NewZone(id)
+		if err != nil {
+			return nil, err
+		}
+		zm.zones[id] = z
+	}
+	return z, nil
 }

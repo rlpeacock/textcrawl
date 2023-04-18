@@ -19,6 +19,10 @@ type Request struct {
 	Actor  *Actor
 }
 
+func (r *Request) Write(msg string) {
+	r.Writer.Write([]byte(msg))
+}
+
 func NewRequest(actor *Actor, writer io.Writer, text string) *Request {
 	return &Request{
 		Actor:  actor,
@@ -43,6 +47,7 @@ type Engine struct {
 	RequestCh   chan *Request
 	HeartbeatCh chan *Heartbeat
 	reqsByActor map[Id][]*Request
+	zoneMgr     *ZoneManager
 }
 
 func NewEngine() *Engine {
@@ -53,6 +58,30 @@ func NewEngine() *Engine {
 	}
 }
 
+func ensureLoggedIn(req *Request) bool {
+	switch req.Actor.Player.LoginState {
+	case LOGIN_COMPLETE:
+		return true
+	case NOT_STARTED:
+		req.Write("Please Enter your username: ")
+		req.Actor.Player.LoginState = WAITING_FOR_USERNAME
+	case WAITING_FOR_USERNAME:
+		if req.Text != "" {
+			req.Actor.Player.Username = req.Text
+			req.Write("Please enter your password: ")
+			req.Actor.Player.LoginState = WAITING_FOR_PASSWORD
+		}
+	case WAITING_FOR_PASSWORD:
+		if req.Text != "" {
+			// TODO: for now, we don't actually have passwords!
+			req.Write("Login successful\n")
+			req.Actor.Player.LoginState = LOGIN_COMPLETE
+			return true
+		}
+	}
+	return false
+}
+
 // We queue up requests for each actor. When we receive a
 // heartbeat message, we process the events we've received.
 // Generally this means taking the first message from each
@@ -61,6 +90,9 @@ func (e *Engine) Run() {
 	for {
 		select {
 		case req := <-e.RequestCh:
+			if !ensureLoggedIn(req) {
+				break
+			}
 			q := e.reqsByActor[req.Actor.Id]
 			if q == nil {
 				q = []*Request{req}
@@ -94,6 +126,7 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 	// by init value and account for multi-tick actions.
 	for _, req := range todo {
 		t := fmt.Sprintf("processing: %s (%d)\r\n", req.Text, hb.tick)
+		ProcessRequest(req)
 		req.Writer.Write([]byte(t))
 		log.Print(t)
 	}
