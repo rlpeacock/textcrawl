@@ -51,7 +51,7 @@ type Engine struct {
 	HeartbeatCh chan *Heartbeat
 	reqsByActor map[Id][]*Request
 	zoneMgr     *ZoneManager
-	luaState *lua.LState
+	luaState    *lua.LState
 }
 
 func NewEngine() *Engine {
@@ -65,7 +65,7 @@ func NewEngine() *Engine {
 		HeartbeatCh: make(chan *Heartbeat, 0),
 		reqsByActor: make(map[Id][]*Request),
 		zoneMgr:     GetZoneMgr(),
-		luaState: ls,
+		luaState:    ls,
 	}
 }
 
@@ -88,33 +88,40 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 			req.Write("Login successful\n")
 			req.Actor.Player.LoginState = LOGIN_COMPLETE
 			// TODO: we also don't have persistent sessions so give an arbitrary location
-			z, e :=  e.zoneMgr.GetZone(Id("1"))
-			if e != nil {
-				log.Printf("Zone get failed: %s", e)
+			z, err := e.zoneMgr.GetZone(Id("1"))
+			if err != nil {
+				log.Printf("Zone get failed: %s", err)
 				req.Write("WTF")
 				return false
 			}
 			req.Actor.Room = z.Rooms[Id("1")]
-			return true
+			req.Actor.Zone = z
+			e.sendPrompt(req)
 		}
 	}
 	return false
 }
 
-
+func (e *Engine) sendPrompt(req *Request) {
+	// this will eventually have status in it
+	req.Write("\n> ")
+}
 
 func (e *Engine) dispatch(req *Request) {
+	if req.Text == "" {
+		return
+	}
 	err := e.luaState.CallByParam(lua.P{
-		Fn: e.luaState.GetGlobal(req.Text),
-		NRet: 1,
+		Fn:      e.luaState.GetGlobal(req.Text),
+		NRet:    1,
 		Protect: true,
 	}, luar.New(e.luaState, req))
 	if err != nil {
 		log.Printf("Script did not succed: %s", err)
 		req.Write(fmt.Sprintf("We failed to %s\n", req.Text))
-	}	
+	}
+	e.sendPrompt(req)
 }
-
 
 // We queue up requests for each actor. When we receive a
 // heartbeat message, we process the events we've received.
@@ -159,10 +166,8 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 	// Go through and handle each request. TODO: we should order these
 	// by init value and account for multi-tick actions.
 	for _, req := range todo {
-		t := fmt.Sprintf("processing: %s (%d)\r\n", req.Text, hb.tick)
+		log.Print(fmt.Sprintf("processing: %s (%d)\r\n", req.Text, hb.tick))
 		e.dispatch(req)
-		req.Writer.Write([]byte(t))
-		log.Print(t)
 	}
 }
 

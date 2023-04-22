@@ -1,3 +1,23 @@
-function look(f, a)
-  f:Write(f.Actor.Room.Desc)
+function look(req)
+  req:Write(req.Actor.Room.Desc)
+end
+
+function north(req)
+   goDirection(req, "north")
+end
+
+function south(req)
+   goDirection(req, "south")
+end
+
+function goDirection(req, dir)
+   exit = req.Actor.Room:GetExit(dir)
+   if exit then
+	  newRoom = req.Actor.Zone:GetRoom(exit.Destination)
+	  newRoom:Receive(req.Actor)
+	  req:Write("You go " .. dir .. "\n")
+	  look(req)
+   else
+	  req:Write("You can't go that way")
+   end
 end

@@ -11,6 +11,10 @@ type Zone struct {
 	Rooms map[Id]*Room
 }
 
+func (z *Zone) GetRoom(id Id) *Room {
+	return z.Rooms[id]
+}
+
 func NewZone(id Id) (*Zone, error) {
 	rooms := make(map[Id]*Room)
 	rooms, err := LoadSampleRooms()

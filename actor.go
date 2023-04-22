@@ -12,13 +12,13 @@ const (
 )
 
 type Player struct {
-	LoginState LoginFlowState
+	LoginState    LoginFlowState
 	LoginAttempts int
-	Username string
+	Username      string
 }
 
 func NewPlayer() *Player {
-	return &Player {
+	return &Player{
 		LoginState: NOT_STARTED,
 	}
 }
@@ -41,17 +41,18 @@ type Inventory struct {
 }
 
 type Actor struct {
-	Id    Id
-	Obj   *Obj
-	Stats *Stats
-	Room  *Room
-	Inv   *Inventory
+	Id     Id
+	Obj    *Obj
+	Stats  *Stats
+	Room   *Room
+	Zone   *Zone
+	Inv    *Inventory
 	Player *Player
 }
 
 func NewActor(id string, player *Player) *Actor {
 	return &Actor{
-		Id: Id(id),
+		Id:     Id(id),
 		Player: player,
 	}
 }
