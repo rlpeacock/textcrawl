@@ -5,6 +5,9 @@ import (
 	"io"
 	"log"
 	"time"
+
+	lua "github.com/yuin/gopher-lua"
+	luar "layeh.com/gopher-luar"
 )
 
 // each connection, when it receives a message, will put it on a channel
@@ -48,14 +51,21 @@ type Engine struct {
 	HeartbeatCh chan *Heartbeat
 	reqsByActor map[Id][]*Request
 	zoneMgr     *ZoneManager
+	luaState *lua.LState
 }
 
 func NewEngine() *Engine {
+	ls := lua.NewState()
+	if err := ls.DoFile("lib/commands.lua"); err != nil {
+		panic(fmt.Sprintf("Script execution failed: %s", err))
+	}
+
 	return &Engine{
 		RequestCh:   make(chan *Request, 0),
 		HeartbeatCh: make(chan *Heartbeat, 0),
 		reqsByActor: make(map[Id][]*Request),
 		zoneMgr:     GetZoneMgr(),
+		luaState: ls,
 	}
 }
 
@@ -90,6 +100,21 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 	}
 	return false
 }
+
+
+
+func (e *Engine) dispatch(req *Request) {
+	err := e.luaState.CallByParam(lua.P{
+		Fn: e.luaState.GetGlobal(req.Text),
+		NRet: 1,
+		Protect: true,
+	}, luar.New(e.luaState, req))
+	if err != nil {
+		log.Printf("Script did not succed: %s", err)
+		req.Write(fmt.Sprintf("We failed to %s\n", req.Text))
+	}	
+}
+
 
 // We queue up requests for each actor. When we receive a
 // heartbeat message, we process the events we've received.
@@ -135,7 +160,7 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 	// by init value and account for multi-tick actions.
 	for _, req := range todo {
 		t := fmt.Sprintf("processing: %s (%d)\r\n", req.Text, hb.tick)
-		ProcessRequest(req)
+		e.dispatch(req)
 		req.Writer.Write([]byte(t))
 		log.Print(t)
 	}
