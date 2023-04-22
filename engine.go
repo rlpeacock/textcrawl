@@ -55,10 +55,11 @@ func NewEngine() *Engine {
 		RequestCh:   make(chan *Request, 0),
 		HeartbeatCh: make(chan *Heartbeat, 0),
 		reqsByActor: make(map[Id][]*Request),
+		zoneMgr:     GetZoneMgr(),
 	}
 }
 
-func ensureLoggedIn(req *Request) bool {
+func (e *Engine) ensureLoggedIn(req *Request) bool {
 	switch req.Actor.Player.LoginState {
 	case LOGIN_COMPLETE:
 		return true
@@ -76,6 +77,14 @@ func ensureLoggedIn(req *Request) bool {
 			// TODO: for now, we don't actually have passwords!
 			req.Write("Login successful\n")
 			req.Actor.Player.LoginState = LOGIN_COMPLETE
+			// TODO: we also don't have persistent sessions so give an arbitrary location
+			z, e :=  e.zoneMgr.GetZone(Id("1"))
+			if e != nil {
+				log.Printf("Zone get failed: %s", e)
+				req.Write("WTF")
+				return false
+			}
+			req.Actor.Room = z.Rooms[Id("1")]
 			return true
 		}
 	}
@@ -90,7 +99,7 @@ func (e *Engine) Run() {
 	for {
 		select {
 		case req := <-e.RequestCh:
-			if !ensureLoggedIn(req) {
+			if !e.ensureLoggedIn(req) {
 				break
 			}
 			q := e.reqsByActor[req.Actor.Id]

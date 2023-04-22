@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+
 	lua "github.com/yuin/gopher-lua"
 	luar "layeh.com/gopher-luar"
 )	
@@ -9,19 +11,27 @@ import (
 var ls *lua.LState = lua.NewState()
 
 func doLook(req *Request) {
+
 	look := `
-function look(f) return f .. " looked in lua!" end
+function look(f, a)
+  f:Write(f.Actor.Room.Desc)
+  return "\nLooked in lua!"
+end
 `
 	if err := ls.DoString(look); err != nil {
-		req.Write("We failed")
+		req.Write("We failed\n")
+		log.Printf("Script execution failed: %s", err)
+		return
 	}
 	err := ls.CallByParam(lua.P{
 		Fn: ls.GetGlobal("look"),
 		NRet: 1,
 		Protect: true,
-	}, luar.New(ls, req.Actor.Player.Username))
+	}, luar.New(ls, req))
 	if err != nil {
-		req.Write("We failed the look")
+		log.Printf("Script did not succed: %s", err)
+		req.Write("We failed the look\n")
+		return
 	}	
 	ret := ls.Get(-1)
 	req.Write(ret.String() + "\n")

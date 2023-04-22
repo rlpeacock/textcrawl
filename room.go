@@ -35,24 +35,8 @@ func LoadSampleRooms() (map[Id]*Room, error) {
 }
 
 var sample_rooms = `
-rooms:
-	1:
-		title: a room
-		desc: This is an empty room. It only exists as a sample.
-		exits:
-			north:
-				dest: 2
-				type: walk
-				diff: 0
-				speed: 1
-	2:
-		title: another room
-		desc: This is a really empty room. Like, nothing here at all.
-		exits:
-			south:
-				dest: 1
-				type: walk
-				diff: 0
-				speed: 1
+1:
+  title: a room
+  desc: This is an empty room. It only exists as a sample.
 `
 

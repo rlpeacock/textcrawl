@@ -35,7 +35,8 @@ func GetZoneMgr() *ZoneManager {
 func (zm *ZoneManager) GetZone(id Id) (*Zone, error) {
 	z := zm.zones[id]
 	if z == nil {
-		z, err := NewZone(id)
+		var err error
+		z, err = NewZone(id)
 		if err != nil {
 			return nil, err
 		}
