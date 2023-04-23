@@ -21,3 +21,8 @@ function goDirection(req, dir)
 	  req:Write("You can't go that way")
    end
 end
+
+function quit(req)
+   req:Write("Goodbye...\n")
+   req.Writer:Close()
+end

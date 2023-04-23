@@ -16,6 +16,26 @@ import (
 // one by one. After all events are processed, it will generate responses
 // and send them to a channel that the reader thread is selecting on
 
+// Message types the engine can handle
+type MessageType int
+
+const (
+	CONNECT MessageType = iota
+	DISCONNECT
+)
+
+type Message struct {
+	mType MessageType
+	Actor *Actor
+}
+
+func NewMessage(t MessageType, a *Actor) Message {
+	return Message{
+		mType: t,
+		Actor: a,
+	}
+}
+
 type Request struct {
 	Writer io.Writer
 	Text   string
@@ -49,6 +69,7 @@ func newHeartbeat(tick int, cmd string) *Heartbeat {
 type Engine struct {
 	RequestCh   chan *Request
 	HeartbeatCh chan *Heartbeat
+	MessageCh   chan Message
 	reqsByActor map[Id][]*Request
 	zoneMgr     *ZoneManager
 	luaState    *lua.LState
@@ -63,6 +84,7 @@ func NewEngine() *Engine {
 	return &Engine{
 		RequestCh:   make(chan *Request, 0),
 		HeartbeatCh: make(chan *Heartbeat, 0),
+		MessageCh:   make(chan Message, 0),
 		reqsByActor: make(map[Id][]*Request),
 		zoneMgr:     GetZoneMgr(),
 		luaState:    ls,
@@ -136,6 +158,8 @@ func (e *Engine) Run() {
 			}
 			q := e.reqsByActor[req.Actor.Id]
 			if q == nil {
+				// Should have been created connect message, but just to be safe...
+				log.Printf("WARN: Request queue missing for actor %s", req.Actor.Id)
 				q = []*Request{req}
 			} else {
 				q = append(q, req)
@@ -146,6 +170,15 @@ func (e *Engine) Run() {
 				return
 			}
 			e.processRequests(hb)
+		case msg := <-e.MessageCh:
+			switch msg.mType {
+			case CONNECT:
+				log.Printf("INFO: %s has connected", msg.Actor.Id)
+				e.reqsByActor[msg.Actor.Id] = []*Request{}
+			case DISCONNECT:
+				log.Printf("INFO: %s has disconnected", msg.Actor.Id)
+				delete(e.reqsByActor, msg.Actor.Id)
+			}
 		}
 	}
 }
@@ -155,12 +188,9 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 	todo := make([]*Request, 0)
 	// Take the first unprocessed request we have from each actor.
 	for id, q := range e.reqsByActor {
-		todo = append(todo, q[0])
-		q = q[1:]
-		if len(q) == 0 {
-			delete(e.reqsByActor, id)
-		} else {
-			e.reqsByActor[id] = q
+		if len(q) > 0 {
+			todo = append(todo, q[0])
+			e.reqsByActor[id] = q[1:]
 		}
 	}
 	// Go through and handle each request. TODO: we should order these
@@ -189,7 +219,7 @@ func heartbeat(c chan *Heartbeat) {
 func main() {
 	fmt.Println("Starting engine")
 	e := NewEngine()
-	s := NewServer(e.RequestCh)
+	s := NewServer(e.MessageCh, e.RequestCh)
 	go s.Serve()
 	go heartbeat(e.HeartbeatCh)
 	e.Run()
