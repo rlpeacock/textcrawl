@@ -38,7 +38,7 @@ func NewMessage(t MessageType, a *Actor) Message {
 
 type Request struct {
 	Writer io.Writer
-	Text   string
+	Cmd    *Command
 	Actor  *Actor
 }
 
@@ -46,11 +46,11 @@ func (r *Request) Write(msg string) {
 	r.Writer.Write([]byte(msg))
 }
 
-func NewRequest(actor *Actor, writer io.Writer, text string) *Request {
+func NewRequest(actor *Actor, writer io.Writer, cmd *Command) *Request {
 	return &Request{
 		Actor:  actor,
 		Writer: writer,
-		Text:   text,
+		Cmd:    cmd,
 	}
 }
 
@@ -99,13 +99,13 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 		req.Write("Please Enter your username: ")
 		req.Actor.Player.LoginState = WAITING_FOR_USERNAME
 	case WAITING_FOR_USERNAME:
-		if req.Text != "" {
-			req.Actor.Player.Username = req.Text
+		if req.Cmd.Action != "" {
+			req.Actor.Player.Username = req.Cmd.Action
 			req.Write("Please enter your password: ")
 			req.Actor.Player.LoginState = WAITING_FOR_PASSWORD
 		}
 	case WAITING_FOR_PASSWORD:
-		if req.Text != "" {
+		if req.Cmd.Action != "" {
 			// TODO: for now, we don't actually have passwords!
 			req.Write("Login successful\n")
 			req.Actor.Player.LoginState = LOGIN_COMPLETE
@@ -130,17 +130,21 @@ func (e *Engine) sendPrompt(req *Request) {
 }
 
 func (e *Engine) dispatch(req *Request) {
-	if req.Text == "" {
+	if req.Cmd.Action == "" {
 		return
 	}
+	args := []lua.LValue{luar.New(e.luaState, req)}
+	for _, a := range req.Cmd.Params {
+		args = append(args, luar.New(e.luaState, a))
+	}
 	err := e.luaState.CallByParam(lua.P{
-		Fn:      e.luaState.GetGlobal(req.Text),
+		Fn:      e.luaState.GetGlobal(req.Cmd.Action),
 		NRet:    1,
 		Protect: true,
-	}, luar.New(e.luaState, req))
+	}, args...)
 	if err != nil {
 		log.Printf("Script did not succed: %s", err)
-		req.Write(fmt.Sprintf("We failed to %s\n", req.Text))
+		req.Write(fmt.Sprintf("We failed to %s\n", req.Cmd.Action))
 	}
 	e.sendPrompt(req)
 }
@@ -196,7 +200,7 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 	// Go through and handle each request. TODO: we should order these
 	// by init value and account for multi-tick actions.
 	for _, req := range todo {
-		log.Print(fmt.Sprintf("processing: %s (%d)\r\n", req.Text, hb.tick))
+		log.Print(fmt.Sprintf("processing: %s (%d)\r\n", req.Cmd.Action, hb.tick))
 		e.dispatch(req)
 	}
 }

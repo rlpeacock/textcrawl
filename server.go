@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net"
-	"strings"
 )
 
 type Server struct {
@@ -49,8 +48,9 @@ func (svr *Server) handleConnection(conn net.Conn) {
 			svr.msgChan <- NewMessage(DISCONNECT, actor)
 			break
 		}
-		txt := strings.TrimSpace(string(b[:n]))
-		req := NewRequest(actor, conn, txt)
+		text := string(b[:n])
+		cmd := NewCommand(actor, text)
+		req := NewRequest(actor, conn, cmd)
 		svr.reqChan <- req
 	}
 }

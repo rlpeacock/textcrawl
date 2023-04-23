@@ -2,14 +2,6 @@ function look(req)
   req:Write(req.Actor.Room.Desc)
 end
 
-function north(req)
-   goDirection(req, "north")
-end
-
-function south(req)
-   goDirection(req, "south")
-end
-
 function goDirection(req, dir)
    exit = req.Actor.Room:GetExit(dir)
    if exit then
