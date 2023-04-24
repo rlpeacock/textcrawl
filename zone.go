@@ -1,5 +1,13 @@
 package main
 
+import (
+	"database/sql"
+	"fmt"
+	"path/filepath"
+
+	_ "github.com/mattn/go-sqlite3"
+)
+
 // a zone is a collection of rooms that are managed together
 // it acts as a boundary for interactivity - that is, everything
 // in a zone will be handled by a single process and can interact
@@ -15,12 +23,22 @@ func (z *Zone) GetRoom(id Id) *Room {
 	return z.Rooms[id]
 }
 
+func loadZoneState(id Id) ([]*Obj, []*Actor) {
+	f := filepath.Join("world", fmt.Sprintf("%s.dat", id))
+	db, err := sql.Open("sqlite3", f)
+	if err != nil {
+		panic(fmt.Sprintf("Could not find database %s", f))
+	}
+	objs := LoadObjects(db, id)
+	mobs := LoadMOBs(db, id)
+	return objs, mobs
+}
+
 func NewZone(id Id) (*Zone, error) {
 	rooms := make(map[Id]*Room)
-	rooms, err := LoadSampleRooms()
-	if err != nil {
-		return nil, err
-	}
+	// rooms, err := LoadSampleRooms()
+	// TODO: process zone state objs into room members
+	// we also need to hook up the actors with the objs
 	return &Zone{
 		Rooms: rooms,
 	}, nil
