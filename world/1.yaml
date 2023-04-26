@@ -1,0 +1,12 @@
+1:
+  title: a room
+  desc: This is an empty room. It only exists as a sample.
+  exits:
+    - direction: north
+      destination: 2
+2:
+  title: another room
+  desc: This is an even emptier room!
+  exits:
+    - direction: south
+      destination: 1

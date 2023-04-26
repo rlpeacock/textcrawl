@@ -2,8 +2,6 @@ package main
 
 import (
 	"log"
-
-	"gopkg.in/yaml.v3"
 )
 
 type Direction string
@@ -56,27 +54,3 @@ func (r *Room) Remove(a *Actor) bool {
 	// TODO: we don't actually properly maintain occupant lists yet
 	return true
 }
-
-func LoadSampleRooms() (map[Id]*Room, error) {
-	rooms := make(map[Id]*Room, 0)
-	err := yaml.Unmarshal([]byte(sample_rooms), &rooms)
-	if err != nil {
-		return nil, err
-	}
-	return rooms, nil
-}
-
-var sample_rooms = `
-1:
-  title: a room
-  desc: This is an empty room. It only exists as a sample.
-  exits:
-    - direction: north
-      destination: 2
-2:
-  title: another room
-  desc: This is an even emptier room!
-  exits:
-    - direction: south
-      destination: 1
-`
