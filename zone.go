@@ -3,8 +3,10 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -16,7 +18,8 @@ import (
 // in a zone will be handled by a single process and can interact
 // without distributed transaction semantics. Cross zone interaction
 // should be tightly restricted and needs to be hardened against
-// IPC failure.
+// IPC failure. Zones are stored as a yaml file and a SQLite database.
+// The yaml file defines the layout and the DB holds current state.
 
 type Zone struct {
 	Id    Id
@@ -42,21 +45,39 @@ func loadRooms(id Id) map[Id]*Room {
 	return rooms
 }
 
-func ensureZoneStateDB(id Id) *sql.DB {
-	f := filepath.Join("world", fmt.Sprintf("%s.dat", id))
-	// TODO: create the DB if it does not exist. Should not only
-	// create the DB but also apply the DDL.
-	db, err := sql.Open("sqlite3", f)
-	if err != nil {
-		panic(fmt.Sprintf("Could not find database %s", f))
+func ensureZoneDB(destFile string) {
+	if info, err := os.Stat(destFile); err != nil {
+		newFile, err := os.Create(destFile)
+		if err != nil {
+			panic(fmt.Sprintf("Unable to create db %s: %s", destFile, err))
+		}
+		defer newFile.Close()
+		template, err := os.Open("world/0.dat")
+		if err != nil {
+			panic(fmt.Sprintf("Could not find template file for creating new zone: %s", err))
+		}
+		defer template.Close()
+		nBytes, err := io.Copy(newFile, template)
+		if err != nil || nBytes == 0 {
+			panic(fmt.Sprintf("Failed to make a new version of zone db: %s", err))
+		}
+	} else {
+		if info.IsDir() {
+			panic(fmt.Sprintf("DB creation failed. %s is a directory!", destFile))
+		}
 	}
-	return db
 }
 
 func (z *Zone) loadZoneState() {
-	// z.db = ensureZoneStateDB(z.Id)
-	// objs := LoadObjects(z.db, z.Id)
-	// mobs := LoadMOBs(z.db, z.Id)
+	f := filepath.Join("world", fmt.Sprintf("%s.dat", z.Id))
+	ensureZoneDB(f)
+	db, err := sql.Open("sqlite3", f)
+	if err != nil {
+		panic(fmt.Sprintf("Could not open database %s", f))
+	}
+	z.db = db
+	LoadObjects(z.db, z.Id)
+	LoadActors(z.db, z.Id)
 	// TODO: process zone state objs into room members
 	// we also need to hook up the actors with the objs
 }

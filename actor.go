@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 )
 
@@ -30,27 +29,6 @@ func NewPlayer() *Player {
 	return &Player{
 		LoginState: NOT_STARTED,
 	}
-}
-
-type Attrib struct {
-	Real int
-	Cur  int
-}
-
-func DeserializeAttrib(s string) (Attrib, error) {
-	parts := strings.Split(s, ":")
-	if len(parts) != 2 {
-		return Attrib{}, errors.New("Malformed attribute: missing delimiter")
-	}
-	real, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return Attrib{}, errors.New("Malformed attribute: real is not a number")
-	}
-	cur, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return Attrib{}, errors.New("Malformed attribute: cur is not a number")
-	}
-	return Attrib{real, cur}, nil
 }
 
 type Stats struct {
@@ -115,33 +93,27 @@ func NewActor(id string, player *Player) *Actor {
 	}
 }
 
-func LoadMOBs(db *sql.DB, zone Id) []*Actor {
+func LoadActors(db *sql.DB, zone Id) []*Actor {
 	rows, err := db.Query(`
 SELECT id, obj_id, stats
-FROM mob
+FROM actor
 WHERE zone = %s
 ORDER BY room`, zone)
 	if err != nil {
 		panic("Oh shit, the database is screwed up!")
 	}
-	mobs := make([]*Actor, 0)
+	actors := make([]*Actor, 0)
 	for rows.Next() {
-		var (
-			id       Id
-			objId    Id
-			rawStats string
-		)
-		rows.Scan(&id, &objId, &rawStats)
-		stats, err := DeserializeStats(id, rawStats)
+		actor := Actor{}
+		var rawStats string
+		rows.Scan(&actor.Id, &actor.Obj, &rawStats)
+		stats := Stats{}
+		err = DeserializeAttribList(rawStats, &stats.Str, &stats.Dex, &stats.Int, &stats.Will, &stats.Health, &stats.Mind)
 		if err != nil {
-			log.Printf("WARN: error loading MOB %s: %s", id, err)
+			log.Printf("WARN: error loading actors %s: %s", actor.Id, err)
 			continue
 		}
-		mob := Actor{
-			Id:    id,
-			Stats: stats,
-		}
-		mobs = append(mobs, &mob)
+		actors = append(actors, &actor)
 	}
-	return mobs
+	return actors
 }
