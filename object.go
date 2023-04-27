@@ -68,10 +68,10 @@ func LoadObjects(db *sql.DB, zone Id) []*Obj {
 	rows, err := db.Query(`
 SELECT id, attributes, title, description, room, flags
 FROM object
-WHERE zone = %s
+WHERE zone = $1
 ORDER BY room`, zone)
 	if err != nil {
-		panic("Oh shit, the database is screwed up!")
+		panic(fmt.Sprintf("Oh shit, the database is screwed up! Error: %s", err))
 	}
 	objs := make([]*Obj, 0)
 	for rows.Next() {
