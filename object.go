@@ -53,6 +53,9 @@ func DeserializeAttribList(attribStr string, attribs ...*Attrib) error {
 	if len(rawAttribs) < len(attribs) {
 		return errors.New(fmt.Sprintf("Attribute does not contain enough values. Expected %d, got %d", len(attribs), len(rawAttribs)))
 	}
+	if len(rawAttribs) > len(attribs) {
+		return errors.New(fmt.Sprintf("Attribute contains too many values. Expected %d, got %d", len(attribs), len(rawAttribs)))
+	}
 	for i, a := range rawAttribs {
 		attrib, err := DeserializeAttrib(a)
 		if err != nil {

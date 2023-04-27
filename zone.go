@@ -42,6 +42,10 @@ func loadRooms(id Id) map[Id]*Room {
 	if err != nil {
 		panic(fmt.Sprintf("Zone %s YAML is not valid: %s:", id, err))
 	}
+	// Need to add id to room struct
+	for id, room := range rooms {
+		room.Id = id
+	}
 	return rooms
 }
 

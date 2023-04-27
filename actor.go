@@ -2,10 +2,8 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
-	"strings"
 )
 
 type LoginFlowState int
@@ -38,39 +36,6 @@ type Stats struct {
 	Will   Attrib
 	Health Attrib
 	Mind   Attrib
-}
-
-func DeserializeStats(mobId Id, s string) (*Stats, error) {
-	a := strings.Split(s, ",")
-	if len(a) != 12 { // 6 attribs, 2 values each
-		return nil, errors.New(fmt.Sprintf("Malformed stat string. Only %d parts found", len(a)))
-	}
-	str, err := DeserializeAttrib(a[0])
-	if err != nil {
-		return nil, err
-	}
-	dex, err := DeserializeAttrib(a[1])
-	if err != nil {
-		return nil, err
-	}
-	intel, err := DeserializeAttrib(a[2])
-	if err != nil {
-		return nil, err
-	}
-	wil, err := DeserializeAttrib(a[3])
-	if err != nil {
-		return nil, err
-	}
-	health, err := DeserializeAttrib(a[4])
-	if err != nil {
-		return nil, err
-	}
-	mind, err := DeserializeAttrib(a[5])
-	if err != nil {
-		return nil, err
-	}
-	return &Stats{str, dex, intel, wil, health, mind}, nil
-
 }
 
 type Inventory struct {
