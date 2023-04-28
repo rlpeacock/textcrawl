@@ -205,6 +205,10 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 	}
 }
 
+func (e *Engine) TriggerShutdown() {
+	e.HeartbeatCh <- &Heartbeat{cmd: "quit"}
+}
+
 func heartbeat(c chan *Heartbeat) {
 	tick := 0
 	for {
