@@ -20,19 +20,21 @@ import (
 type MessageType int
 
 const (
-	CONNECT MessageType = iota
-	DISCONNECT
+	Connect MessageType = iota
+	Disconnect
 )
 
 type Message struct {
-	mType MessageType
-	Actor *Actor
+	mType  MessageType
+	Writer io.Writer
+	Actor  *Actor
 }
 
-func NewMessage(t MessageType, a *Actor) Message {
+func NewMessage(t MessageType, a *Actor, w io.Writer) Message {
 	return Message{
-		mType: t,
-		Actor: a,
+		mType:  t,
+		Actor:  a,
+		Writer: w,
 	}
 }
 
@@ -93,22 +95,22 @@ func NewEngine() *Engine {
 
 func (e *Engine) ensureLoggedIn(req *Request) bool {
 	switch req.Actor.Player.LoginState {
-	case LOGIN_COMPLETE:
+	case LoginStateLoggedIn:
 		return true
-	case NOT_STARTED:
-		req.Write("Please Enter your username: ")
-		req.Actor.Player.LoginState = WAITING_FOR_USERNAME
-	case WAITING_FOR_USERNAME:
+	case LoginStateStart:
+		req.Actor.Player.LoginState = LoginStateWantUser
+		req.Write("Please enter your username: ")
+	case LoginStateWantUser:
 		if req.Cmd.Action != "" {
 			req.Actor.Player.Username = req.Cmd.Action
+			req.Actor.Player.LoginState = LoginStateWantPwd
 			req.Write("Please enter your password: ")
-			req.Actor.Player.LoginState = WAITING_FOR_PASSWORD
 		}
-	case WAITING_FOR_PASSWORD:
+	case LoginStateWantPwd:
 		if req.Cmd.Action != "" {
 			// TODO: for now, we don't actually have passwords!
 			req.Write("Login successful\n")
-			req.Actor.Player.LoginState = LOGIN_COMPLETE
+			req.Actor.Player.LoginState = LoginStateLoggedIn
 			// TODO: we also don't have persistent sessions so give an arbitrary location
 			z, err := e.zoneMgr.GetZone(Id("1"))
 			if err != nil {
@@ -176,10 +178,11 @@ func (e *Engine) Run() {
 			e.processRequests(hb)
 		case msg := <-e.MessageCh:
 			switch msg.mType {
-			case CONNECT:
+			case Connect:
 				log.Printf("INFO: %s has connected", msg.Actor.Id)
 				e.reqsByActor[msg.Actor.Id] = []*Request{}
-			case DISCONNECT:
+				e.ensureLoggedIn(NewRequest(msg.Actor, msg.Writer, NewCommand(msg.Actor, "wut")))
+			case Disconnect:
 				log.Printf("INFO: %s has disconnected", msg.Actor.Id)
 				delete(e.reqsByActor, msg.Actor.Id)
 			}

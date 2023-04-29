@@ -19,7 +19,7 @@ func NewServer(msgChan chan Message, reqChan chan *Request) *Server {
 	}
 }
 
-func (svr *Server) Serve() {
+func (s *Server) Serve() {
 	ln, err := net.Listen("tcp", ":8888")
 	if err != nil {
 		panic(err)
@@ -30,27 +30,27 @@ func (svr *Server) Serve() {
 			log.Printf("Error accepting connection: %svr", err)
 			continue
 		}
-		svr.conns = append(svr.conns, conn)
-		go svr.handleConnection(conn)
+		s.conns = append(s.conns, conn)
+		go s.handleConnection(conn)
 	}
 }
 
-func (svr *Server) handleConnection(conn net.Conn) {
+func (s *Server) handleConnection(conn net.Conn) {
 	log.Printf("Got a connection from %svr", conn.RemoteAddr())
 	// TODO: for now using IP address, not sure what should really be done here
 	actor := NewActor(conn.RemoteAddr().String(), NewPlayer())
-	svr.msgChan <- NewMessage(CONNECT, actor)
+	s.msgChan <- NewMessage(Connect, actor, conn)
 	b := make([]byte, 100)
 	for {
 		n, err := conn.Read(b)
 		if err != nil {
 			log.Printf("Got connection read error: %s", err)
-			svr.msgChan <- NewMessage(DISCONNECT, actor)
+			s.msgChan <- NewMessage(Disconnect, actor, nil)
 			break
 		}
 		text := string(b[:n])
 		cmd := NewCommand(actor, text)
 		req := NewRequest(actor, conn, cmd)
-		svr.reqChan <- req
+		s.reqChan <- req
 	}
 }

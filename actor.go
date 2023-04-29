@@ -6,26 +6,28 @@ import (
 	"log"
 )
 
-type LoginFlowState int
+type LoginState int
 
+// Don't add anything here without updating String() func below!
+// TODO: can I use introspection to make this less fragile?
 const (
-	NOT_STARTED = iota
-	WAITING_FOR_USERNAME
-	WAITING_FOR_PASSWORD
-	BAD_LOGIN_INFO
-	MAX_FAILURES
-	LOGIN_COMPLETE
+	LoginStateStart LoginState = iota
+	LoginStateWantUser
+	LoginStateWantPwd
+	LoginStateFailed
+	LoginStateMaxFailed
+	LoginStateLoggedIn
 )
 
 type Player struct {
-	LoginState    LoginFlowState
+	LoginState    LoginState
 	LoginAttempts int
 	Username      string
 }
 
 func NewPlayer() *Player {
 	return &Player{
-		LoginState: NOT_STARTED,
+		LoginState: LoginStateStart,
 	}
 }
 

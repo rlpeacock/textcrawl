@@ -53,14 +53,32 @@ func TestLogin(t *testing.T) {
 	go e.Run()
 	defer e.TriggerShutdown()
 	ts := newTestSession(e)
-	ts.sendRequest("a")
+	if ts.req.Actor.Player.LoginState != LoginStateStart {
+		t.Errorf("Should have started in %s, but actually was %s", LoginStateStart, ts.req.Actor.Player.LoginState)
+	}
+	// Because of how we're testing, we need to send an initial request to prime the session.
+	// Normally this would happen when server received a connection.
+	ts.sendRequest("something")
 	s := ts.getResponse()
-	if s != "Please Enter your username: " {
+	if s != "Please enter your username: " {
 		t.Errorf("Expected username prompt, got '%s'", s)
 	}
-	ts.sendRequest("b")
+	if ts.req.Actor.Player.LoginState != LoginStateWantUser {
+		t.Errorf("Should have been in %s, but actually was %s", LoginStateWantUser, ts.req.Actor.Player.LoginState)
+	}
+
+	ts.sendRequest("username")
 	s = ts.getResponse()
 	if s != "Please enter your password: " {
 		t.Errorf("Expected password prompt, got '%s'", s)
+	}
+	if ts.req.Actor.Player.LoginState != LoginStateWantPwd {
+		t.Errorf("Should have been in %s, but actually was %s", LoginStateWantPwd, ts.req.Actor.Player.LoginState)
+	}
+
+	ts.sendRequest("pwd")
+	s = ts.getResponse()
+	if ts.req.Actor.Player.LoginState != LoginStateLoggedIn {
+		t.Errorf("Should have been in %s, but actually was %s", LoginStateLoggedIn, ts.req.Actor.Player.LoginState)
 	}
 }
