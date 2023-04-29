@@ -19,18 +19,6 @@ const (
 	LoginStateLoggedIn
 )
 
-type Player struct {
-	LoginState    LoginState
-	LoginAttempts int
-	Username      string
-}
-
-func NewPlayer() *Player {
-	return &Player{
-		LoginState: LoginStateStart,
-	}
-}
-
 type Stats struct {
 	Str    Attrib
 	Dex    Attrib
