@@ -118,7 +118,9 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 				req.Write("WTF")
 				return false
 			}
-			req.Actor.Room = z.Rooms[Id("1")]
+			if !z.Rooms[Id("1")].Receive(req.Actor) {
+				panic("Can't insert actor into room!")
+			}
 			req.Actor.Zone = z
 			e.sendPrompt(req)
 		}

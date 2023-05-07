@@ -27,6 +27,7 @@ var translations = map[string][]string{
 	"southwest": {"goDirection", "southwest"},
 	"se":        {"goDirection", "southeast"},
 	"southeast": {"goDirection", "southeast"},
+	"l":         {"look"},
 }
 
 func NewCommand(actor *Actor, text string) *Command {

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Id string
@@ -28,7 +30,7 @@ type Obj struct {
 	Title      string
 	Desc       string
 	Durability Attrib
-	Room       Id
+	Room       *Room
 	Flags      ObjectFlags
 }
 
@@ -67,22 +69,37 @@ func DeserializeAttribList(attribStr string, attribs ...*Attrib) error {
 	return nil
 }
 
-func LoadObjects(db *sql.DB, zone Id) []*Obj {
+func LoadObjects(db *sql.DB, rooms map[Id]*Room) []*Obj {
 	rows, err := db.Query(`
 SELECT id, attributes, title, description, room, flags
 FROM object
-WHERE zone = $1
-ORDER BY room`, zone)
+ORDER BY room`)
 	if err != nil {
 		panic(fmt.Sprintf("Oh shit, the database is screwed up! Error: %s", err))
 	}
+	defer rows.Close()
 	objs := make([]*Obj, 0)
 	for rows.Next() {
 		obj := Obj{}
-		var attribs string
-		rows.Scan(&obj.Id, &attribs, &obj.Title, &obj.Desc, &obj.Room, &obj.Flags)
+		var (
+			attribs string
+			roomId  string
+		)
+		err = rows.Scan(&obj.Id, &attribs, &obj.Title, &obj.Desc, &roomId, &obj.Flags)
+		if err != nil {
+			panic(fmt.Sprintf("Error while iterating rows: %s", err))
+		}
+		room := rooms[Id(roomId)]
+		if room == nil {
+			print(fmt.Sprintf("WARN: object '%s' is in invalid room '%s'", obj.Id, roomId))
+		}
+		room.Take(&obj)
 		DeserializeAttribList(attribs, &obj.Weight, &obj.Size, &obj.Durability)
 		objs = append(objs, &obj)
+	}
+	err = rows.Err()
+	if err != nil {
+		panic(fmt.Sprintf("Error while iterating rows: %s", err))
 	}
 	return objs
 }

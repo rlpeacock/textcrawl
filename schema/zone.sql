@@ -1,14 +1,15 @@
 CREATE TABLE IF NOT EXISTS object (
-	   id INTEGER PRIMARY KEY ASC,
+	   id TEXT PRIMARY KEY NOT NULL,
 	   attributes TEXT NOT NULL,
 	   title TEXT NOT NULL,
 	   description TEXT NOT NULL,
-	   room INTEGER NOT NULL,
-	   flags INTEGER
+	   room TEXT NOT NULL,
+	   flags INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS actor (
-	   id INTEGER PRIMARY KEY ASC,
-	   obj_id INTEGER NOT NULL,
-	   stats TEXT NOT NULL
+	   id TEXT PRIMARY KEY NOT NULL,
+	   obj_id TEXT NOT NULL,
+	   stats TEXT NOT NULL,
+	   FOREIGN KEY (obj_id) REFERENCES object (id)	   
 );

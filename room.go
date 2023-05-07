@@ -1,9 +1,5 @@
 package main
 
-import (
-	"log"
-)
-
 type Direction string
 
 type MoveType string
@@ -35,12 +31,11 @@ func (r *Room) GetExit(d Direction) *Exit {
 }
 
 func (r *Room) Receive(a *Actor) bool {
-	if a.Room.Remove(a) {
+	if a.Room == nil || a.Room.Remove(a) {
 		r.Occupants = append(r.Occupants, a)
 		a.Room = r
 		return true
 	}
-	log.Printf("Actor is now in %s", a.Room.Id)
 	return false
 }
 
@@ -51,6 +46,24 @@ func (r *Room) Remove(a *Actor) bool {
 			return true
 		}
 	}
-	// TODO: we don't actually properly maintain occupant lists yet
-	return true
+	return false
+}
+
+func (r *Room) Take(o *Obj) bool {
+	if o.Room == nil || o.Room.Give(o) {
+		r.Contents = append(r.Contents, o)
+		o.Room = r
+		return true
+	}
+	return false
+}
+
+func (r *Room) Give(o *Obj) bool {
+	for i, c := range r.Contents {
+		if c == o {
+			r.Contents = append(r.Contents[:i], r.Contents[i+1:]...)
+			return true
+		}
+	}
+	return false
 }

@@ -80,10 +80,14 @@ func (z *Zone) loadZoneState() {
 		panic(fmt.Sprintf("Could not open database %s", f))
 	}
 	z.db = db
-	LoadObjects(z.db, z.Id)
-	LoadActors(z.db, z.Id)
+	objs := LoadObjects(z.db, z.Rooms)
+	objsById := make(map[Id]*Obj, len(objs))
+	for _, o := range objs {
+		objsById[o.Id] = o
+	}
+	_ = LoadActors(z.db, objsById)
 	// TODO: process zone state objs into room members
-	// we also need to hook up the actors with the objs
+
 }
 
 func NewZone(id Id) (*Zone, error) {
