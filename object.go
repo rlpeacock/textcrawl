@@ -14,6 +14,12 @@ type Id string
 
 type ObjectFlags int
 
+type Container interface {
+	Take(o *Obj) bool
+	Give(o *Obj) bool
+	ID() Id
+}
+
 const (
 	MOB = 1
 )
@@ -23,6 +29,8 @@ type Attrib struct {
 	Cur  int
 }
 
+type Inventory []*Obj
+
 type Obj struct {
 	Id         Id
 	Weight     Attrib
@@ -30,8 +38,40 @@ type Obj struct {
 	Title      string
 	Desc       string
 	Durability Attrib
-	Room       *Room
+	Loc        Id
+	Owner      Container
+	Contents   Inventory
 	Flags      ObjectFlags
+	dirty      bool
+}
+
+func (o *Obj) NewOwner(c Container) {
+	o.Owner = c
+	o.Loc = c.ID()
+	o.dirty = true
+}
+
+func (o *Obj) Take(obj *Obj) bool {
+	if obj.Owner == nil || obj.Owner.Give(obj) {
+		o.Contents = append(o.Contents, obj)
+		obj.NewOwner(o)
+		return true
+	}
+	return false
+}
+
+func (o *Obj) Give(obj *Obj) bool {
+	for i, io := range o.Contents {
+		if io == obj {
+			o.Contents = append(o.Contents[:i], o.Contents[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (o *Obj) ID() Id {
+	return o.Id
 }
 
 func DeserializeAttrib(s string) (Attrib, error) {
@@ -69,33 +109,27 @@ func DeserializeAttribList(attribStr string, attribs ...*Attrib) error {
 	return nil
 }
 
-func LoadObjects(db *sql.DB, rooms map[Id]*Room) []*Obj {
+func LoadObjects(db *sql.DB) map[Id]*Obj {
 	rows, err := db.Query(`
-SELECT id, attributes, title, description, room, flags
+SELECT id, attributes, title, description, location, flags
 FROM object
-ORDER BY room`)
+ORDER BY location`)
 	if err != nil {
 		panic(fmt.Sprintf("Oh shit, the database is screwed up! Error: %s", err))
 	}
 	defer rows.Close()
-	objs := make([]*Obj, 0)
+	objs := make(map[Id]*Obj, 0)
 	for rows.Next() {
 		obj := Obj{}
 		var (
 			attribs string
-			roomId  string
 		)
-		err = rows.Scan(&obj.Id, &attribs, &obj.Title, &obj.Desc, &roomId, &obj.Flags)
+		err = rows.Scan(&obj.Id, &attribs, &obj.Title, &obj.Desc, &obj.Loc, &obj.Flags)
 		if err != nil {
 			panic(fmt.Sprintf("Error while iterating rows: %s", err))
 		}
-		room := rooms[Id(roomId)]
-		if room == nil {
-			print(fmt.Sprintf("WARN: object '%s' is in invalid room '%s'", obj.Id, roomId))
-		}
-		room.Take(&obj)
 		DeserializeAttribList(attribs, &obj.Weight, &obj.Size, &obj.Durability)
-		objs = append(objs, &obj)
+		objs[obj.Id] = &obj
 	}
 	err = rows.Err()
 	if err != nil {

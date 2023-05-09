@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS object (
 	   attributes TEXT NOT NULL,
 	   title TEXT NOT NULL,
 	   description TEXT NOT NULL,
-	   room TEXT NOT NULL,
+	   location TEXT NOT NULL,
 	   flags INTEGER NOT NULL
 );
 

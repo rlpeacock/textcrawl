@@ -17,7 +17,7 @@ type Room struct {
 	Title     string
 	Desc      string
 	Occupants []*Actor
-	Contents  []*Obj
+	Contents  Inventory
 	Exits     []*Exit
 }
 
@@ -33,7 +33,7 @@ func (r *Room) GetExit(d Direction) *Exit {
 func (r *Room) Receive(a *Actor) bool {
 	if a.Room == nil || a.Room.Remove(a) {
 		r.Occupants = append(r.Occupants, a)
-		a.Room = r
+		a.NewRoom(r)
 		return true
 	}
 	return false
@@ -50,9 +50,9 @@ func (r *Room) Remove(a *Actor) bool {
 }
 
 func (r *Room) Take(o *Obj) bool {
-	if o.Room == nil || o.Room.Give(o) {
+	if o.Owner == nil || o.Owner.Give(o) {
 		r.Contents = append(r.Contents, o)
-		o.Room = r
+		o.NewOwner(r)
 		return true
 	}
 	return false
@@ -66,4 +66,8 @@ func (r *Room) Give(o *Obj) bool {
 		}
 	}
 	return false
+}
+
+func (r *Room) ID() Id {
+	return r.Id
 }

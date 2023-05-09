@@ -80,14 +80,29 @@ func (z *Zone) loadZoneState() {
 		panic(fmt.Sprintf("Could not open database %s", f))
 	}
 	z.db = db
-	objs := LoadObjects(z.db, z.Rooms)
-	objsById := make(map[Id]*Obj, len(objs))
-	for _, o := range objs {
-		objsById[o.Id] = o
-	}
+	objsById := LoadObjects(z.db)
 	_ = LoadActors(z.db, objsById)
-	// TODO: process zone state objs into room members
+	// insert objects into their owner's inventory
+	for _, obj := range objsById {
+		switch obj.Loc[0] {
+		case 'C':
+			container := objsById[obj.Loc]
+			if container != nil {
+				container.Take(obj)
+			} else {
+				log.Printf(fmt.Sprintf("Object '%s' belongs to unknown container '%s'", obj.Id, obj.Loc))
+			}
+		case 'R':
+			// Room IDs don't start with R to keep things simple for YAML
+			room := z.Rooms[obj.Loc[1:]]
+			if room != nil {
+				room.Take(obj)
+			} else {
+				log.Printf(fmt.Sprintf("Object '%s' belongs to unknown room '%s'", obj.Id, obj.Loc))
+			}
 
+		}
+	}
 }
 
 func NewZone(id Id) (*Zone, error) {
