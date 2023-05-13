@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 )
@@ -49,8 +50,12 @@ func (s *Server) handleConnection(conn net.Conn) {
 			break
 		}
 		text := string(b[:n])
-		cmd := NewCommand(actor, text)
-		req := NewRequest(actor, conn, cmd)
-		s.reqChan <- req
+		cmd, e := NewCommand(actor, text)
+		if e == nil {
+			req := NewRequest(actor, conn, cmd)
+			s.reqChan <- req
+		} else {
+			conn.Write([]byte(fmt.Sprintf("Failed: %s", e)))
+		}
 	}
 }

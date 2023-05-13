@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"testing"
 )
@@ -11,20 +12,25 @@ type testSession struct {
 	reader io.Reader
 	ch     chan string
 	e      *Engine
+	t      *testing.T
 }
 
-func newTestSession(e *Engine) *testSession {
+func newTestSession(e *Engine, t *testing.T) *testSession {
 	r, w := io.Pipe()
 	a := NewActor("1", NewPlayer())
-	c := NewCommand(a, "")
-	t := &testSession{
+	c, err := NewCommand(a, "")
+	if err != nil {
+		panic(fmt.Sprintf("Session creation failed because command creation got an error: %s", err))
+	}
+	ts := &testSession{
 		req:    NewRequest(a, w, c),
 		reader: r,
 		ch:     make(chan string),
 		e:      e,
+		t:      t,
 	}
-	go t.readResponses()
-	return t
+	go ts.readResponses()
+	return ts
 }
 
 func (t *testSession) readResponses() {
@@ -40,7 +46,11 @@ func (t *testSession) readResponses() {
 }
 
 func (t *testSession) sendRequest(text string) {
-	t.req.Cmd = NewCommand(t.req.Actor, text)
+	cmd, e := NewCommand(t.req.Actor, text)
+	t.req.Cmd = cmd
+	if e != nil {
+		t.t.Fatalf("Could not send request because parse failed: %s", e)
+	}
 	t.e.RequestCh <- t.req
 }
 
@@ -52,7 +62,7 @@ func TestLogin(t *testing.T) {
 	e := NewEngine()
 	go e.Run()
 	defer e.TriggerShutdown()
-	ts := newTestSession(e)
+	ts := newTestSession(e, t)
 	if ts.req.Actor.Player.LoginState != LoginStateStart {
 		t.Errorf("Should have started in %s, but actually was %s", LoginStateStart, ts.req.Actor.Player.LoginState)
 	}

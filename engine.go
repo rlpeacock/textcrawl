@@ -183,7 +183,8 @@ func (e *Engine) Run() {
 			case Connect:
 				log.Printf("INFO: %s has connected", msg.Actor.Id)
 				e.reqsByActor[msg.Actor.Id] = []*Request{}
-				e.ensureLoggedIn(NewRequest(msg.Actor, msg.Writer, NewCommand(msg.Actor, "wut")))
+				cmd, _ := NewCommand(msg.Actor, "wut")
+				e.ensureLoggedIn(NewRequest(msg.Actor, msg.Writer, cmd))
 			case Disconnect:
 				log.Printf("INFO: %s has disconnected", msg.Actor.Id)
 				delete(e.reqsByActor, msg.Actor.Id)

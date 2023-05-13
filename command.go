@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 type Command struct {
 	Text        string
@@ -53,7 +57,7 @@ var prepositions = []string{
 	"under",
 }
 
-func NewCommand(actor *Actor, text string) *Command {
+func NewCommand(actor *Actor, text string) (*Command, error) {
 	text = strings.TrimSpace(text)
 	words := strings.Split(text, " ")
 	action, params := TranslateAction(words[0])
@@ -77,11 +81,17 @@ func NewCommand(actor *Actor, text string) *Command {
 			for _, p := range prepositions {
 				if w == p {
 					cmd.Preposition = p
+					break
 				}
 			}
+			if cmd.Preposition == "" {
+				return nil, errors.New(fmt.Sprintf("bWhat is '%s'?", w))
+			}
+		} else {
+			return nil, errors.New(fmt.Sprintf("bWhat is '%s'?", w))
 		}
 	}
-	return cmd
+	return cmd, nil
 }
 
 // look for abbreviations and other mappings
