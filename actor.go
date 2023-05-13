@@ -32,7 +32,7 @@ type Stats struct {
 
 type Actor struct {
 	Id     Id
-	Obj    *Obj
+	Body   *Thing
 	Stats  *Stats
 	Room   *Room
 	Zone   *Zone
@@ -43,7 +43,7 @@ func NewActor(id string, player *Player) *Actor {
 	return &Actor{
 		Id:     Id(id),
 		Player: player,
-		Obj: &Obj{
+		Body: &Thing{
 			Title: "yourself",
 		},
 	}
@@ -51,15 +51,15 @@ func NewActor(id string, player *Player) *Actor {
 
 func (a *Actor) NewRoom(r *Room) {
 	a.Room = r
-	a.Obj.NewOwner(r)
+	a.Body.NewOwner(r)
 }
 
-func (a *Actor) Give(o *Obj) bool {
-	return a.Obj.Give(o)
+func (a *Actor) Give(o *Thing) bool {
+	return a.Body.Give(o)
 }
 
-func (a *Actor) Take(o *Obj) bool {
-	return a.Obj.Take(o)
+func (a *Actor) Take(o *Thing) bool {
+	return a.Body.Take(o)
 }
 
 func (a *Actor) ID() Id {
@@ -67,13 +67,17 @@ func (a *Actor) ID() Id {
 	// and we want to use the actor's object as the owner to
 	// simplify loading. However, the name is confusing for
 	// the actor object. Rename?
-	return a.Obj.Id
+	return a.Body.Id
 }
 
-func LoadActors(db *sql.DB, objs map[Id]*Obj) map[Id]*Actor {
+func (a *Actor) Match(word string) MatchLevel {
+	return a.Body.Match(word)
+}
+
+func LoadActors(db *sql.DB, things map[Id]*Thing) map[Id]*Actor {
 	rows, err := db.Query(`
-SELECT a.id, obj_id, stats
-FROM actor a JOIN object o ON a.obj_id = o.id`)
+SELECT a.id, thing_id, stats
+FROM actor a JOIN thing t ON a.thing_id = t.id`)
 	if err != nil {
 		panic(fmt.Sprintf("Oh shit, the database is screwed up! Error: %s", err))
 	}
@@ -83,15 +87,15 @@ FROM actor a JOIN object o ON a.obj_id = o.id`)
 		actor := Actor{}
 		var (
 			rawStats string
-			objId    string
+			thingId  string
 		)
-		err = rows.Scan(&actor.Id, &objId, &rawStats)
+		err = rows.Scan(&actor.Id, &thingId, &rawStats)
 		if err != nil {
 			panic(fmt.Sprintf("Error will scanning actor row: %s", err))
 		}
-		obj := objs[Id(objId)]
-		if obj == nil {
-			log.Printf("WARN: actor '%s' has invalid object id '%s'", actor.Id, objId)
+		thing := things[Id(thingId)]
+		if thing == nil {
+			log.Printf("WARN: actor '%s' has invalid object id '%s'", actor.Id, thingId)
 			continue
 		}
 		stats := Stats{}

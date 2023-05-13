@@ -16,8 +16,8 @@ func TestGetZone(t *testing.T) {
 	if len(r.Contents) == 0 {
 		t.Fatalf("Room 1 should have an item in it but is empty")
 	}
-	obj := r.Contents[0]
-	if obj.Title != "tin knife" {
-		t.Errorf("Expected object in room 1 to be 'tin knife', but got '%s'", obj.Title)
+	thing := r.Contents[0]
+	if thing.Title != "tin knife" {
+		t.Errorf("Expected object in room 1 to be 'tin knife', but got '%s'", thing.Title)
 	}
 }

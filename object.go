@@ -12,26 +12,33 @@ import (
 
 type Id string
 
-type ObjectFlags int
+type ThingFlags int
 
-type Container interface {
-	Take(o *Obj) bool
-	Give(o *Obj) bool
-	ID() Id
-}
+type MatchLevel int
 
+// to indicate how closely a word matches the object's title
 const (
-	MOB = 1
+	MatchNone MatchLevel = iota
+	MatchPartial
+	MatchPrimary
+	MatchExact
 )
+
+type Entity interface {
+	Take(t *Thing) bool
+	Give(t *Thing) bool
+	ID() Id
+	Match(word string) MatchLevel
+}
 
 type Attrib struct {
 	Real int
 	Cur  int
 }
 
-type Inventory []*Obj
+type Inventory []*Thing
 
-type Obj struct {
+type Thing struct {
 	Id         Id
 	Weight     Attrib
 	Size       Attrib
@@ -39,39 +46,52 @@ type Obj struct {
 	Desc       string
 	Durability Attrib
 	Loc        Id
-	Owner      Container
+	Owner      Entity
 	Contents   Inventory
-	Flags      ObjectFlags
+	Flags      ThingFlags
 	dirty      bool
 }
 
-func (o *Obj) NewOwner(c Container) {
-	o.Owner = c
-	o.Loc = c.ID()
-	o.dirty = true
+func (t *Thing) NewOwner(e Entity) {
+	t.Owner = e
+	t.Loc = e.ID()
+	t.dirty = true
 }
 
-func (o *Obj) Take(obj *Obj) bool {
-	if obj.Owner == nil || obj.Owner.Give(obj) {
-		o.Contents = append(o.Contents, obj)
-		obj.NewOwner(o)
+func (t *Thing) Take(thing *Thing) bool {
+	if thing.Owner == nil || thing.Owner.Give(thing) {
+		t.Contents = append(t.Contents, thing)
+		thing.NewOwner(t)
 		return true
 	}
 	return false
 }
 
-func (o *Obj) Give(obj *Obj) bool {
-	for i, io := range o.Contents {
-		if io == obj {
-			o.Contents = append(o.Contents[:i], o.Contents[i+1:]...)
+func (t *Thing) Give(thing *Thing) bool {
+	for i, io := range t.Contents {
+		if io == thing {
+			t.Contents = append(t.Contents[:i], t.Contents[i+1:]...)
 			return true
 		}
 	}
 	return false
 }
 
-func (o *Obj) ID() Id {
-	return o.Id
+func (t *Thing) ID() Id {
+	return t.Id
+}
+
+func (t *Thing) Match(word string) MatchLevel {
+	if t.Title == word {
+		return MatchExact
+	}
+	if strings.HasPrefix(t.Title, word) {
+		return MatchPrimary
+	}
+	if strings.Contains(t.Title, word) {
+		return MatchPartial
+	}
+	return MatchNone
 }
 
 func DeserializeAttrib(s string) (Attrib, error) {
@@ -109,31 +129,31 @@ func DeserializeAttribList(attribStr string, attribs ...*Attrib) error {
 	return nil
 }
 
-func LoadObjects(db *sql.DB) map[Id]*Obj {
+func LoadThings(db *sql.DB) map[Id]*Thing {
 	rows, err := db.Query(`
 SELECT id, attributes, title, description, location, flags
-FROM object
+FROM thing
 ORDER BY location`)
 	if err != nil {
 		panic(fmt.Sprintf("Oh shit, the database is screwed up! Error: %s", err))
 	}
 	defer rows.Close()
-	objs := make(map[Id]*Obj, 0)
+	things := make(map[Id]*Thing, 0)
 	for rows.Next() {
-		obj := Obj{}
+		thing := Thing{}
 		var (
 			attribs string
 		)
-		err = rows.Scan(&obj.Id, &attribs, &obj.Title, &obj.Desc, &obj.Loc, &obj.Flags)
+		err = rows.Scan(&thing.Id, &attribs, &thing.Title, &thing.Desc, &thing.Loc, &thing.Flags)
 		if err != nil {
 			panic(fmt.Sprintf("Error while iterating rows: %s", err))
 		}
-		DeserializeAttribList(attribs, &obj.Weight, &obj.Size, &obj.Durability)
-		objs[obj.Id] = &obj
+		DeserializeAttribList(attribs, &thing.Weight, &thing.Size, &thing.Durability)
+		things[thing.Id] = &thing
 	}
 	err = rows.Err()
 	if err != nil {
 		panic(fmt.Sprintf("Error while iterating rows: %s", err))
 	}
-	return objs
+	return things
 }

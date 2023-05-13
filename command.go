@@ -3,11 +3,12 @@ package main
 import "strings"
 
 type Command struct {
-	Text   string
-	Action string
-	Params []string
-	Obj    []*Obj
-	DObj   []*Obj
+	Text        string
+	Action      string
+	Params      []string
+	Preposition string
+	Obj         []Entity
+	DObj        []Entity
 }
 
 var translations = map[string][]string{
@@ -30,18 +31,57 @@ var translations = map[string][]string{
 	"l":         {"look"},
 }
 
+var prepositions = []string{
+	"above",
+	"across",
+	"after",
+	"against",
+	"around",
+	"before",
+	"behind",
+	"below",
+	"down",
+	"from",
+	"in",
+	"inside",
+	"into",
+	"off",
+	"on",
+	"over",
+	"through",
+	"to",
+	"under",
+}
+
 func NewCommand(actor *Actor, text string) *Command {
 	text = strings.TrimSpace(text)
 	words := strings.Split(text, " ")
 	action, params := TranslateAction(words[0])
-	// TODO: match remaining words against object in room
-	return &Command{
-		Text:   text,
-		Action: action,
-		Params: params,
-		Obj:    make([]*Obj, 0),
-		DObj:   make([]*Obj, 0),
+	cmd := &Command{
+		Text:        text,
+		Action:      action,
+		Params:      params,
+		Preposition: "",
+		Obj:         make([]Entity, 0),
+		DObj:        make([]Entity, 0),
 	}
+	for _, w := range words[1:] {
+		entity := actor.Room.Find(w)
+		if entity != nil {
+			if cmd.Preposition == "" {
+				cmd.Obj = append(cmd.Obj, entity)
+			} else {
+				cmd.DObj = append(cmd.DObj, entity)
+			}
+		} else if cmd.Preposition == "" {
+			for _, p := range prepositions {
+				if w == p {
+					cmd.Preposition = p
+				}
+			}
+		}
+	}
+	return cmd
 }
 
 // look for abbreviations and other mappings

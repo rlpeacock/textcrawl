@@ -80,25 +80,25 @@ func (z *Zone) loadZoneState() {
 		panic(fmt.Sprintf("Could not open database %s", f))
 	}
 	z.db = db
-	objsById := LoadObjects(z.db)
-	_ = LoadActors(z.db, objsById)
+	thingsById := LoadThings(z.db)
+	_ = LoadActors(z.db, thingsById)
 	// insert objects into their owner's inventory
-	for _, obj := range objsById {
-		switch obj.Loc[0] {
+	for _, thing := range thingsById {
+		switch thing.Loc[0] {
 		case 'C':
-			container := objsById[obj.Loc]
+			container := thingsById[thing.Loc]
 			if container != nil {
-				container.Take(obj)
+				container.Take(thing)
 			} else {
-				log.Printf(fmt.Sprintf("Object '%s' belongs to unknown container '%s'", obj.Id, obj.Loc))
+				log.Printf(fmt.Sprintf("Object '%s' belongs to unknown container '%s'", thing.Id, thing.Loc))
 			}
 		case 'R':
 			// Room IDs don't start with R to keep things simple for YAML
-			room := z.Rooms[obj.Loc[1:]]
+			room := z.Rooms[thing.Loc[1:]]
 			if room != nil {
-				room.Take(obj)
+				room.Take(thing)
 			} else {
-				log.Printf(fmt.Sprintf("Object '%s' belongs to unknown room '%s'", obj.Id, obj.Loc))
+				log.Printf(fmt.Sprintf("Object '%s' belongs to unknown room '%s'", thing.Id, thing.Loc))
 			}
 
 		}
@@ -107,7 +107,7 @@ func (z *Zone) loadZoneState() {
 
 func NewZone(id Id) (*Zone, error) {
 	log.Printf("Loading zone %s", id)
-	// db, objs, mobs := loadZoneState(id)
+	// db, things, mobs := loadZoneState(id)
 	zone := &Zone{
 		Id:    id,
 		Rooms: loadRooms(id),

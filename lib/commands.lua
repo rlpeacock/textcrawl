@@ -9,7 +9,7 @@ function look(req)
    if req.Actor.Room.Occupants and #req.Actor.Room.Occupants > 0 then
 	  req:Write("There are in this room:\n")
 	  for i = 1, #req.Actor.Room.Occupants do
-		 req:Write("  " .. req.Actor.Room.Occupants[i].Obj.Title .. "\n")
+		 req:Write("  " .. req.Actor.Room.Occupants[i].Body.Title .. "\n")
 	  end
    end
 
