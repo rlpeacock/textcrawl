@@ -7,12 +7,12 @@ import (
 )
 
 type Command struct {
-	Text        string
-	Action      string
-	Params      []string
-	Preposition string
-	Obj         []Entity
-	DObj        []Entity
+	Text         string
+	Action       string
+	Params       []string
+	Preposition  string
+	DirectObjs   []Entity
+	IndirectObjs []Entity
 }
 
 var translations = map[string][]string{
@@ -62,20 +62,20 @@ func NewCommand(actor *Actor, text string) (*Command, error) {
 	words := strings.Split(text, " ")
 	action, params := TranslateAction(words[0])
 	cmd := &Command{
-		Text:        text,
-		Action:      action,
-		Params:      params,
-		Preposition: "",
-		Obj:         make([]Entity, 0),
-		DObj:        make([]Entity, 0),
+		Text:         text,
+		Action:       action,
+		Params:       params,
+		Preposition:  "",
+		DirectObjs:   make([]Entity, 0),
+		IndirectObjs: make([]Entity, 0),
 	}
 	for _, w := range words[1:] {
 		entity := actor.Room.Find(w)
 		if entity != nil {
 			if cmd.Preposition == "" {
-				cmd.Obj = append(cmd.Obj, entity)
+				cmd.DirectObjs = append(cmd.DirectObjs, entity)
 			} else {
-				cmd.DObj = append(cmd.DObj, entity)
+				cmd.IndirectObjs = append(cmd.IndirectObjs, entity)
 			}
 		} else if cmd.Preposition == "" {
 			for _, p := range prepositions {
@@ -85,10 +85,10 @@ func NewCommand(actor *Actor, text string) (*Command, error) {
 				}
 			}
 			if cmd.Preposition == "" {
-				return nil, errors.New(fmt.Sprintf("bWhat is '%s'?", w))
+				return nil, errors.New(fmt.Sprintf("What is '%s'?", w))
 			}
 		} else {
-			return nil, errors.New(fmt.Sprintf("bWhat is '%s'?", w))
+			return nil, errors.New(fmt.Sprintf("What is '%s'?", w))
 		}
 	}
 	return cmd, nil
