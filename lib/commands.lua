@@ -36,6 +36,45 @@ function goDirection(req, dir)
    end
 end
 
+function take(req)
+   if #req.Cmd.DirectObjs == 0 then
+	  req:Write("Take what?")
+   else
+	  for i = 1, #req.Cmd.DirectObjs do
+		 obj = req.Cmd.DirectObjs[i]
+		 if req.Actor:Take(obj) then
+			req:Write("You get the " .. obj.Title .. "\n")
+		 else
+			req:Write("You failed to take " .. obj.Title .. "\n")
+		 end
+	  end
+   end
+end
+
+function drop(req)
+   if #req.Cmd.DirectObjs == 0 then
+	  req:Write("Drop what?")
+   else
+	  for i = 1, #req.Cmd.DirectObjs do
+		 obj = req.Cmd.DirectObjs[i]
+		 if req.Actor.Room:Take(obj) then
+			req:Write("You drop the " .. obj.Title .. "\n")
+		 else
+			req:Write("You failed to drop the " .. obj.Title .. "\n")
+		 end
+	  end
+   end
+
+end
+
+function inventory(req)
+   req:Write("You have:\n")
+   for i = 1, #req.Actor.Body.Contents do
+	  req:Write(req.Actor.Body.Contents[i].Title .. "\n")
+   end
+end
+
+
 function quit(req)
    req:Write("Goodbye...\n")
    req.Writer:Close()

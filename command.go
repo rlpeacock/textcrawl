@@ -33,6 +33,8 @@ var translations = map[string][]string{
 	"se":        {"goDirection", "southeast"},
 	"southeast": {"goDirection", "southeast"},
 	"l":         {"look"},
+	"i":         {"inventory"},
+	"inv":       {"inventory"},
 }
 
 var prepositions = []string{
@@ -71,6 +73,10 @@ func NewCommand(actor *Actor, text string) (*Command, error) {
 	}
 	for _, w := range words[1:] {
 		entity := actor.Room.Find(w)
+		// if not in room, check actor's inventory
+		if entity == nil {
+			entity = actor.Find(w)
+		}
 		if entity != nil {
 			if cmd.Preposition == "" {
 				cmd.DirectObjs = append(cmd.DirectObjs, entity)

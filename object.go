@@ -29,6 +29,7 @@ type Entity interface {
 	Give(t *Thing) bool
 	ID() Id
 	Match(word string) MatchLevel
+	Find(word string) Entity
 }
 
 type Attrib struct {
@@ -92,6 +93,21 @@ func (t *Thing) Match(word string) MatchLevel {
 		return MatchPartial
 	}
 	return MatchNone
+}
+
+func (t *Thing) Find(word string) Entity {
+	bestMatch := struct {
+		match  MatchLevel
+		entity Entity
+	}{match: MatchNone}
+	for _, obj := range t.Contents {
+		match := obj.Match(word)
+		if match > bestMatch.match {
+			bestMatch.match = match
+			bestMatch.entity = obj
+		}
+	}
+	return bestMatch.entity
 }
 
 func DeserializeAttrib(s string) (Attrib, error) {

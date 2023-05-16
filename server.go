@@ -55,7 +55,10 @@ func (s *Server) handleConnection(conn net.Conn) {
 			req := NewRequest(actor, conn, cmd)
 			s.reqChan <- req
 		} else {
-			conn.Write([]byte(fmt.Sprintf("Failed: %s", e)))
+			// TODO: we actually want to send the failed parse to the engine
+			// because we will need it to construct the proper response.
+			// This will require changes to Request to support busted commands.
+			conn.Write([]byte(fmt.Sprintf("Failed: %s\n> ", e)))
 		}
 	}
 }

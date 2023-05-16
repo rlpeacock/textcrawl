@@ -74,6 +74,10 @@ func (a *Actor) Match(word string) MatchLevel {
 	return a.Body.Match(word)
 }
 
+func (a *Actor) Find(word string) Entity {
+	return a.Body.Find(word)
+}
+
 func LoadActors(db *sql.DB, things map[Id]*Thing) map[Id]*Actor {
 	rows, err := db.Query(`
 SELECT a.id, thing_id, stats
