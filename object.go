@@ -24,12 +24,48 @@ const (
 	MatchExact
 )
 
-type Entity interface {
-	Take(t *Thing) bool
-	Give(t *Thing) bool
+type GObject interface {
 	ID() Id
-	Match(word string) MatchLevel
-	Find(word string) Entity
+	ParentID() Id
+	GetTitle() string
+	Take(obj GObject) bool
+}
+
+type Locus struct {
+	Parent   *Locus
+	Children []*Locus
+	Object   GObject
+}
+
+func NewLocus(obj GObject) *Locus {
+	return &Locus{
+		Children: make([]*Locus, 0),
+		Object:   obj,
+	}
+}
+
+func (n *Locus) Insert(child *Locus) bool {
+	if n.Object.Take(child.Object) {
+		if child.Parent != nil {
+			for i, o := range child.Parent.Children {
+				if o == child {
+					child.Parent.Children = append(child.Parent.Children[:i], child.Parent.Children[i+1:]...)
+				}
+			}
+		}
+		child.Parent = n
+		n.Children = append(n.Children, child)
+		return true
+	}
+	return false
+}
+
+func (l *Locus) ID() Id {
+	return l.Object.ID()
+}
+
+func (l *Locus) ParentID() Id {
+	return l.Object.ParentID()
 }
 
 type Attrib struct {
@@ -37,7 +73,35 @@ type Attrib struct {
 	Cur  int
 }
 
-type Inventory []*Thing
+func (n *Locus) Match(word string) MatchLevel {
+	if n.Object.GetTitle() == word {
+		return MatchExact
+	}
+	if strings.HasPrefix(n.Object.GetTitle(), word) {
+		return MatchPrimary
+	}
+	if strings.Contains(n.Object.GetTitle(), word) {
+		return MatchPartial
+	}
+	return MatchNone
+}
+
+func (n *Locus) Find(word string) *Locus {
+	bestMatch := struct {
+		match MatchLevel
+		node  *Locus
+	}{match: MatchNone}
+	for _, child := range n.Children {
+		match := child.Match(word)
+		if match > bestMatch.match {
+			bestMatch.match = match
+			bestMatch.node = child
+		}
+	}
+	return bestMatch.node
+}
+
+// --------------------------------
 
 type Thing struct {
 	Id         Id
@@ -46,68 +110,27 @@ type Thing struct {
 	Title      string
 	Desc       string
 	Durability Attrib
-	Loc        Id
-	Owner      Entity
-	Contents   Inventory
+	Parent     Id
 	Flags      ThingFlags
 	dirty      bool
 }
 
-func (t *Thing) NewOwner(e Entity) {
-	t.Owner = e
-	t.Loc = e.ID()
-	t.dirty = true
-}
-
-func (t *Thing) Take(thing *Thing) bool {
-	if thing.Owner == nil || thing.Owner.Give(thing) {
-		t.Contents = append(t.Contents, thing)
-		thing.NewOwner(t)
-		return true
-	}
-	return false
-}
-
-func (t *Thing) Give(thing *Thing) bool {
-	for i, io := range t.Contents {
-		if io == thing {
-			t.Contents = append(t.Contents[:i], t.Contents[i+1:]...)
-			return true
-		}
-	}
-	return false
+func (t *Thing) GetTitle() string {
+	return t.Title
 }
 
 func (t *Thing) ID() Id {
 	return t.Id
 }
 
-func (t *Thing) Match(word string) MatchLevel {
-	if t.Title == word {
-		return MatchExact
-	}
-	if strings.HasPrefix(t.Title, word) {
-		return MatchPrimary
-	}
-	if strings.Contains(t.Title, word) {
-		return MatchPartial
-	}
-	return MatchNone
+func (t *Thing) ParentID() Id {
+	return t.Parent
 }
 
-func (t *Thing) Find(word string) Entity {
-	bestMatch := struct {
-		match  MatchLevel
-		entity Entity
-	}{match: MatchNone}
-	for _, obj := range t.Contents {
-		match := obj.Match(word)
-		if match > bestMatch.match {
-			bestMatch.match = match
-			bestMatch.entity = obj
-		}
-	}
-	return bestMatch.entity
+func (t *Thing) Take(obj GObject) bool {
+	// TODO: later this will actually check capacity
+	// but for now, anything can go in anything
+	return true
 }
 
 func DeserializeAttrib(s string) (Attrib, error) {
@@ -160,7 +183,7 @@ ORDER BY location`)
 		var (
 			attribs string
 		)
-		err = rows.Scan(&thing.Id, &attribs, &thing.Title, &thing.Desc, &thing.Loc, &thing.Flags)
+		err = rows.Scan(&thing.Id, &attribs, &thing.Title, &thing.Desc, &thing.Parent, &thing.Flags)
 		if err != nil {
 			panic(fmt.Sprintf("Error while iterating rows: %s", err))
 		}

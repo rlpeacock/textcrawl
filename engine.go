@@ -112,16 +112,20 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 			req.Write("Login successful\n")
 			req.Actor.Player.LoginState = LoginStateLoggedIn
 			// TODO: we also don't have persistent sessions so give an arbitrary location
-			z, err := e.zoneMgr.GetZone(Id("1"))
+			zone, err := e.zoneMgr.GetZone(Id("1"))
 			if err != nil {
 				log.Printf("Zone get failed: %s", err)
 				req.Write("WTF")
 				return false
 			}
-			if !z.Rooms[Id("1")].Receive(req.Actor) {
+
+			actorLoc := NewLocus(req.Actor)
+			zone.Actors[req.Actor.ID()] = actorLoc
+			if !zone.Rooms[Id("1")].Insert(actorLoc) {
+				// TODO: this isn't what we should do!
 				panic("Can't insert actor into room!")
 			}
-			req.Actor.Zone = z
+			req.Actor.Zone = zone
 			e.sendPrompt(req)
 		}
 	}
@@ -183,8 +187,8 @@ func (e *Engine) Run() {
 			case Connect:
 				log.Printf("INFO: %s has connected", msg.Actor.Id)
 				e.reqsByActor[msg.Actor.Id] = []*Request{}
-				cmd, _ := NewCommand(msg.Actor, "wut")
-				e.ensureLoggedIn(NewRequest(msg.Actor, msg.Writer, cmd))
+				// For a new connection, kick the login flow so the user gets a prompt
+				e.ensureLoggedIn(NewRequest(msg.Actor, msg.Writer, NewCommand("")))
 			case Disconnect:
 				log.Printf("INFO: %s has disconnected", msg.Actor.Id)
 				delete(e.reqsByActor, msg.Actor.Id)

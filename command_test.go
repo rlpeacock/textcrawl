@@ -9,9 +9,10 @@ func TestNewCommand(t *testing.T) {
 	if e != nil {
 		t.Fatalf("Couldn't even get the zone! %s", e)
 	}
-	a := NewActor("", nil)
-	a.Room = z.GetRoom(Id("1"))
-	cmd, e := NewCommand(a, " look ")
+	a := NewLocus(NewActor("", nil))
+	room := z.Rooms[Id("1")]
+	cmd := NewCommand(" look ")
+	e = cmd.ResolveWords(room, a)
 	if e != nil {
 		t.Fatalf("Error parsing command ' look ': %s", e)
 	}
@@ -19,7 +20,7 @@ func TestNewCommand(t *testing.T) {
 		t.Errorf("Expected action 'look' but got '%s'", cmd.Action)
 	}
 
-	cmd, e = NewCommand(a, "sw")
+	cmd = NewCommand("sw")
 	if e != nil {
 		t.Fatalf("Error parsing command 'sw': %s", e)
 	}
@@ -33,7 +34,7 @@ func TestNewCommand(t *testing.T) {
 		t.Errorf("Expected parameter 'southwest' but got '%s'", cmd.Params[0])
 	}
 
-	cmd, e = NewCommand(a, "take knife")
+	cmd = NewCommand("take knife")
 	if e != nil {
 		t.Fatalf("Error parsing command 'take knife': %s", e)
 	}
@@ -43,14 +44,14 @@ func TestNewCommand(t *testing.T) {
 	if len(cmd.DirectObjs) != 1 {
 		t.Fatalf("Expected 1 direct object but got %d", len(cmd.DirectObjs))
 	}
-	if _, ok := cmd.DirectObjs[0].(*Thing); !ok {
+	if _, ok := cmd.DirectObjs[0].Object.(*Thing); !ok {
 		t.Errorf("Expected and entity type 'thing' but that's not what we got")
 	}
 	if cmd.DirectObjs[0].ID() != "T1" {
 		t.Errorf("Expected T1 but got '%s'", cmd.DirectObjs[0].ID())
 	}
 
-	cmd, e = NewCommand(a, "give knife to man")
+	cmd = NewCommand("give knife to man")
 	if e != nil {
 		t.Fatalf("Error parsing command 'give knife to man': %s", e)
 	}
@@ -67,7 +68,7 @@ func TestNewCommand(t *testing.T) {
 		t.Errorf("Expected T2 for indirect object but got '%s'", cmd.IndirectObjs[0].ID())
 	}
 
-	cmd, e = NewCommand(a, "give knife bucket to man")
+	cmd = NewCommand("give knife bucket to man")
 	if e != nil {
 		t.Fatalf("Error parsing command 'give knife bucket to man': %s", e)
 	}

@@ -11,8 +11,8 @@ type Command struct {
 	Action       string
 	Params       []string
 	Preposition  string
-	DirectObjs   []Entity
-	IndirectObjs []Entity
+	DirectObjs   []*Locus
+	IndirectObjs []*Locus
 }
 
 var translations = map[string][]string{
@@ -59,45 +59,13 @@ var prepositions = []string{
 	"under",
 }
 
-func NewCommand(actor *Actor, text string) (*Command, error) {
-	text = strings.TrimSpace(text)
-	words := strings.Split(text, " ")
-	action, params := TranslateAction(words[0])
-	cmd := &Command{
-		Text:         text,
-		Action:       action,
-		Params:       params,
+func NewCommand(text string) *Command {
+	return &Command{
+		Text:         strings.TrimSpace(text),
 		Preposition:  "",
-		DirectObjs:   make([]Entity, 0),
-		IndirectObjs: make([]Entity, 0),
+		DirectObjs:   make([]*Locus, 0),
+		IndirectObjs: make([]*Locus, 0),
 	}
-	for _, w := range words[1:] {
-		entity := actor.Room.Find(w)
-		// if not in room, check actor's inventory
-		if entity == nil {
-			entity = actor.Find(w)
-		}
-		if entity != nil {
-			if cmd.Preposition == "" {
-				cmd.DirectObjs = append(cmd.DirectObjs, entity)
-			} else {
-				cmd.IndirectObjs = append(cmd.IndirectObjs, entity)
-			}
-		} else if cmd.Preposition == "" {
-			for _, p := range prepositions {
-				if w == p {
-					cmd.Preposition = p
-					break
-				}
-			}
-			if cmd.Preposition == "" {
-				return nil, errors.New(fmt.Sprintf("What is '%s'?", w))
-			}
-		} else {
-			return nil, errors.New(fmt.Sprintf("What is '%s'?", w))
-		}
-	}
-	return cmd, nil
 }
 
 // look for abbreviations and other mappings
@@ -107,4 +75,36 @@ func TranslateAction(text string) (string, []string) {
 		t = []string{text}
 	}
 	return t[0], t[1:]
+}
+
+func (c *Command) ResolveWords(room *Locus, actor *Locus) error {
+	words := strings.Split(c.Text, " ")
+	c.Action, c.Params = TranslateAction(words[0])
+	for _, w := range words[1:] {
+		entity := room.Find(w)
+		// if not in room, check actor's inventory
+		if entity == nil {
+			entity = actor.Find(w)
+		}
+		if entity != nil {
+			if c.Preposition == "" {
+				c.DirectObjs = append(c.DirectObjs, entity)
+			} else {
+				c.IndirectObjs = append(c.IndirectObjs, entity)
+			}
+		} else if c.Preposition == "" {
+			for _, p := range prepositions {
+				if w == p {
+					c.Preposition = p
+					break
+				}
+			}
+			if c.Preposition == "" {
+				return errors.New(fmt.Sprintf("What is '%s'?", w))
+			}
+		} else {
+			return errors.New(fmt.Sprintf("What is '%s'?", w))
+		}
+	}
+	return nil
 }

@@ -9,15 +9,15 @@ func TestGetZone(t *testing.T) {
 	if e != nil {
 		t.Errorf("GetZoneMgr().GetZone(Id(1)) returned an error: %s", e)
 	}
-	r := z.GetRoom(Id("1"))
-	if r.Title != "a room" {
-		t.Errorf(`z.GetRoom(Id(1)) should have returned room 'a room', but got '%s'`, r.Title)
+	loc := z.Rooms[Id("1")]
+	if loc.Object.GetTitle() != "a room" {
+		t.Errorf(`z.GetRoom(Id(1)) should have returned room 'a room', but got '%s'`, loc.Object.GetTitle())
 	}
-	if len(r.Contents) == 0 {
+	if len(loc.Children) == 0 {
 		t.Fatalf("Room 1 should have an item in it but is empty")
 	}
-	thing := r.Contents[0]
-	if thing.Title != "tin knife" {
-		t.Errorf("Expected object in room 1 to be 'tin knife', but got '%s'", thing.Title)
+	child := loc.Children[0]
+	if child.Object.GetTitle() != "tin knife" {
+		t.Errorf("Expected object in room 1 to be 'tin knife', but got '%s'", child.Object.GetTitle())
 	}
 }

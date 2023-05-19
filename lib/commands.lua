@@ -25,7 +25,7 @@ function goDirection(req, dir)
    exit = req.Actor.Room:GetExit(dir)
    if exit then
 	  newRoom = req.Actor.Zone:GetRoom(exit.Destination)
-	  if newRoom:Receive(req.Actor) then
+	  if newRoom:Insert(req.Actor) then
 		 req:Write("You go " .. dir .. "\n")
 		 look(req)
 	  else
@@ -42,7 +42,7 @@ function take(req)
    else
 	  for i = 1, #req.Cmd.DirectObjs do
 		 obj = req.Cmd.DirectObjs[i]
-		 if req.Actor:Take(obj) then
+		 if req.Actor:Insert(obj) then
 			req:Write("You get the " .. obj.Title .. "\n")
 		 else
 			req:Write("You failed to take " .. obj.Title .. "\n")
@@ -57,7 +57,7 @@ function drop(req)
    else
 	  for i = 1, #req.Cmd.DirectObjs do
 		 obj = req.Cmd.DirectObjs[i]
-		 if req.Actor.Room:Take(obj) then
+		 if req.Actor.Room:Insert(obj) then
 			req:Write("You drop the " .. obj.Title .. "\n")
 		 else
 			req:Write("You failed to drop the " .. obj.Title .. "\n")

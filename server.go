@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 )
@@ -38,9 +37,14 @@ func (s *Server) Serve() {
 
 func (s *Server) handleConnection(conn net.Conn) {
 	log.Printf("Got a connection from %svr", conn.RemoteAddr())
-	// TODO: for now using IP address, not sure what should really be done here
+	// TODO: for now using IP address, not sure what should really be done
+	// Note that the new actor will not be placed anywhere until completing
+	// login flow.
 	actor := NewActor(conn.RemoteAddr().String(), NewPlayer())
+	// Tell the engine we've got somebody joining
 	s.msgChan <- NewMessage(Connect, actor, conn)
+	// Loop forever, processing input from the user. Break if the
+	// connection drops.
 	b := make([]byte, 100)
 	for {
 		n, err := conn.Read(b)
@@ -50,15 +54,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 			break
 		}
 		text := string(b[:n])
-		cmd, e := NewCommand(actor, text)
-		if e == nil {
-			req := NewRequest(actor, conn, cmd)
-			s.reqChan <- req
-		} else {
-			// TODO: we actually want to send the failed parse to the engine
-			// because we will need it to construct the proper response.
-			// This will require changes to Request to support busted commands.
-			conn.Write([]byte(fmt.Sprintf("Failed: %s\n> ", e)))
-		}
+		cmd := NewCommand(text)
+		req := NewRequest(actor, conn, cmd)
+		s.reqChan <- req
 	}
 }

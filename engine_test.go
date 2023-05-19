@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"testing"
 )
@@ -18,10 +17,7 @@ type testSession struct {
 func newTestSession(e *Engine, t *testing.T) *testSession {
 	r, w := io.Pipe()
 	a := NewActor("1", NewPlayer())
-	c, err := NewCommand(a, "")
-	if err != nil {
-		panic(fmt.Sprintf("Session creation failed because command creation got an error: %s", err))
-	}
+	c := NewCommand("")
 	ts := &testSession{
 		req:    NewRequest(a, w, c),
 		reader: r,
@@ -46,11 +42,8 @@ func (t *testSession) readResponses() {
 }
 
 func (t *testSession) sendRequest(text string) {
-	cmd, e := NewCommand(t.req.Actor, text)
+	cmd := NewCommand(text)
 	t.req.Cmd = cmd
-	if e != nil {
-		t.t.Fatalf("Could not send request because parse failed: %s", e)
-	}
 	t.e.RequestCh <- t.req
 }
 

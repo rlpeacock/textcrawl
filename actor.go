@@ -34,7 +34,6 @@ type Actor struct {
 	Id     Id
 	Body   *Thing
 	Stats  *Stats
-	Room   *Room
 	Zone   *Zone
 	Player *Player
 }
@@ -49,33 +48,25 @@ func NewActor(id string, player *Player) *Actor {
 	}
 }
 
-func (a *Actor) NewRoom(r *Room) {
-	a.Room = r
-	a.Body.NewOwner(r)
-}
-
-func (a *Actor) Give(o *Thing) bool {
-	return a.Body.Give(o)
-}
-
-func (a *Actor) Take(o *Thing) bool {
-	return a.Body.Take(o)
-}
-
 func (a *Actor) ID() Id {
 	// TODO: this is used to tell objects who their owner is,
-	// and we want to use the actor's object as the owner to
+	// and we want to use the actor's body as the owner to
 	// simplify loading. However, the name is confusing for
 	// the actor object. Rename?
 	return a.Body.Id
 }
 
-func (a *Actor) Match(word string) MatchLevel {
-	return a.Body.Match(word)
+func (a *Actor) ParentID() Id {
+	return a.Body.Parent
 }
 
-func (a *Actor) Find(word string) Entity {
-	return a.Body.Find(word)
+func (a *Actor) GetTitle() string {
+	return a.Body.Title
+}
+
+func (a *Actor) Take(obj GObject) bool {
+	// TODO: check carrying capacity but for now can carry anything
+	return true
 }
 
 func LoadActors(db *sql.DB, things map[Id]*Thing) map[Id]*Actor {
@@ -86,7 +77,7 @@ FROM actor a JOIN thing t ON a.thing_id = t.id`)
 		panic(fmt.Sprintf("Oh shit, the database is screwed up! Error: %s", err))
 	}
 	defer rows.Close()
-	actors := make(map[Id]*Actor, 0)
+	actors := make(map[Id]*Actor)
 	for rows.Next() {
 		actor := Actor{}
 		var (
@@ -97,8 +88,8 @@ FROM actor a JOIN thing t ON a.thing_id = t.id`)
 		if err != nil {
 			panic(fmt.Sprintf("Error will scanning actor row: %s", err))
 		}
-		thing := things[Id(thingId)]
-		if thing == nil {
+		actor.Body = things[Id(thingId)]
+		if actor.Body == nil {
 			log.Printf("WARN: actor '%s' has invalid object id '%s'", actor.Id, thingId)
 			continue
 		}
