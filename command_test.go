@@ -4,15 +4,17 @@ import (
 	"testing"
 )
 
-func TestNewCommand(t *testing.T) {
-	z, e := GetZoneMgr().GetZone(Id("1"))
-	if e != nil {
-		t.Fatalf("Couldn't even get the zone! %s", e)
-	}
-	a := NewLocus(NewActor("", nil))
-	room := z.Rooms[Id("1")]
-	cmd := NewCommand(" look ")
+func DoCommand(text string) (*Command, error) {
+	a := NewLocus(NewActor("1", NewPlayer()))
+	zone, e := GetZoneMgr().GetZone("1")
+	room := zone.Rooms["R1"]
+	cmd := NewCommand(text)
 	e = cmd.ResolveWords(room, a)
+	return cmd, e
+}
+
+func TestNewCommand(t *testing.T) {
+	cmd, e := DoCommand(" look ")
 	if e != nil {
 		t.Fatalf("Error parsing command ' look ': %s", e)
 	}
@@ -20,7 +22,7 @@ func TestNewCommand(t *testing.T) {
 		t.Errorf("Expected action 'look' but got '%s'", cmd.Action)
 	}
 
-	cmd = NewCommand("sw")
+	cmd, e = DoCommand("sw")
 	if e != nil {
 		t.Fatalf("Error parsing command 'sw': %s", e)
 	}
@@ -34,7 +36,7 @@ func TestNewCommand(t *testing.T) {
 		t.Errorf("Expected parameter 'southwest' but got '%s'", cmd.Params[0])
 	}
 
-	cmd = NewCommand("take knife")
+	cmd, e = DoCommand("take knife")
 	if e != nil {
 		t.Fatalf("Error parsing command 'take knife': %s", e)
 	}
@@ -51,7 +53,7 @@ func TestNewCommand(t *testing.T) {
 		t.Errorf("Expected T1 but got '%s'", cmd.DirectObjs[0].ID())
 	}
 
-	cmd = NewCommand("give knife to man")
+	cmd, e = DoCommand("give knife to man")
 	if e != nil {
 		t.Fatalf("Error parsing command 'give knife to man': %s", e)
 	}
@@ -68,7 +70,7 @@ func TestNewCommand(t *testing.T) {
 		t.Errorf("Expected T2 for indirect object but got '%s'", cmd.IndirectObjs[0].ID())
 	}
 
-	cmd = NewCommand("give knife bucket to man")
+	cmd, e = DoCommand("give knife bucket to man")
 	if e != nil {
 		t.Fatalf("Error parsing command 'give knife bucket to man': %s", e)
 	}

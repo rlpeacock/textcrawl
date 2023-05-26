@@ -47,8 +47,8 @@ func loadRooms(id Id) map[Id]*Locus {
 	for rid, room := range rooms {
 		// Need to add id to room struct because it's a key rather than a field
 		// in YAML peristence.
-		room.Id = rid
-		nodes[id] = NewLocus(room)
+		room.Id = "R" + rid
+		nodes[room.Id] = NewLocus(room)
 	}
 	return nodes
 }
@@ -108,7 +108,9 @@ func (z *Zone) loadZoneState() {
 		pId := locus.Object.ParentID()
 		parent := lociById[pId]
 		if parent == nil {
-			log.Printf(fmt.Sprintf("WARN: object '%s' has an invalid parent '%s'", locus.ID(), pId))
+			if pId != "" {
+				log.Printf(fmt.Sprintf("WARN: object '%s' has an invalid parent '%s'", locus.ID(), pId))
+			}
 			continue
 		}
 		parent.Insert(locus)

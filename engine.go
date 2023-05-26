@@ -101,13 +101,13 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 		req.Actor.Player.LoginState = LoginStateWantUser
 		req.Write("Please enter your username: ")
 	case LoginStateWantUser:
-		if req.Cmd.Action != "" {
-			req.Actor.Player.Username = req.Cmd.Action
+		if req.Cmd.Text != "" {
+			req.Actor.Player.Username = req.Cmd.Text
 			req.Actor.Player.LoginState = LoginStateWantPwd
 			req.Write("Please enter your password: ")
 		}
 	case LoginStateWantPwd:
-		if req.Cmd.Action != "" {
+		if req.Cmd.Text != "" {
 			// TODO: for now, we don't actually have passwords!
 			req.Write("Login successful\n")
 			req.Actor.Player.LoginState = LoginStateLoggedIn
@@ -121,7 +121,7 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 
 			actorLoc := NewLocus(req.Actor)
 			zone.Actors[req.Actor.ID()] = actorLoc
-			if !zone.Rooms[Id("1")].Insert(actorLoc) {
+			if !zone.Rooms[Id("R1")].Insert(actorLoc) {
 				// TODO: this isn't what we should do!
 				panic("Can't insert actor into room!")
 			}
@@ -138,6 +138,8 @@ func (e *Engine) sendPrompt(req *Request) {
 }
 
 func (e *Engine) dispatch(req *Request) {
+	room := req.Actor.Zone.Rooms[req.Actor.Body.Parent]
+	req.Cmd.ResolveWords(req.Actor.Zone.Actors[req.Actor.Id], room)
 	if req.Cmd.Action == "" {
 		return
 	}
