@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -30,12 +31,17 @@ type Stats struct {
 	Mind   Attrib
 }
 
+// An Actor is an entity that can perform actions. Actors may
+// be players, or they may be NPCs/MOBs. The Actor structure
+// holds attributes of the actor outside of it's actual place
+// in the game. That is represented by the 'body' attribute.
 type Actor struct {
-	Id     Id
-	Body   *Thing
-	Stats  *Stats
-	Zone   *Zone
-	Player *Player
+	Id        Id
+	Body      *Thing
+	Stats     *Stats
+	Zone      *Zone
+	Player    *Player
+	Inventory []*Thing
 }
 
 func NewActor(id string, player *Player) *Actor {
@@ -56,19 +62,66 @@ func (a *Actor) ID() Id {
 	return a.Body.Id
 }
 
-func (a *Actor) ParentID() Id {
-	return a.Body.Parent
+func (a *Actor) SetRoom(r *Room) {
+	a.Body.ParentId = r.Id
 }
 
 func (a *Actor) GetTitle() string {
 	return a.Body.Title
 }
 
-func (a *Actor) Take(obj GObject) bool {
+// Will this actor accept possession of supplied object?
+func (a *Actor) Accept(thing Thing) bool {
 	// TODO: check carrying capacity but for now can carry anything
 	return true
 }
 
+// return object holding position of actor within the object hierarchy
+func (a *Actor) Room() *Room {
+	return a.Zone.GetRoom(a.Body.ParentId)
+}
+
+func (a *Actor) Match(word string) MatchLevel {
+	if a.GetTitle() == word {
+		return MatchExact
+	}
+	if strings.HasPrefix(a.GetTitle(), word) {
+		return MatchPrimary
+	}
+	if strings.Contains(a.GetTitle(), word) {
+		return MatchPartial
+	}
+	return MatchNone
+}
+
+func (a *Actor) Find(word string) *Thing {
+	bestMatch := struct {
+		match MatchLevel
+		thing *Thing
+	}{match: MatchNone}
+	for _, item := range a.Inventory {
+		match := item.Match(word)
+		if match > bestMatch.match {
+			bestMatch.match = match
+			bestMatch.thing = item
+		}
+	}
+	return bestMatch.thing
+}
+
+func (a *Actor) Insert(child *Thing) {
+	a.Inventory = append(a.Inventory, child)
+}
+
+func (a *Actor) Remove(thing *Thing) {
+	for i, item := range a.Inventory {
+		if item == thing {
+			a.Inventory = append(a.Inventory[:i], a.Inventory[i+1:]...)
+		}
+	}
+}
+
+// Load all actors from SQLite DB
 func LoadActors(db *sql.DB, things map[Id]*Thing) map[Id]*Actor {
 	rows, err := db.Query(`
 SELECT a.id, thing_id, stats

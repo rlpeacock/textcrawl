@@ -23,16 +23,16 @@ import (
 
 type Zone struct {
 	Id     Id
-	Rooms  map[Id]*Locus
-	Actors map[Id]*Locus
+	Rooms  map[Id]*Room
+	Actors map[Id]*Actor
 	db     *sql.DB
 }
 
 func (z *Zone) GetRoom(id Id) *Room {
-	return z.Rooms[id].Object.(*Room)
+	return z.Rooms[id]
 }
 
-func loadRooms(id Id) map[Id]*Locus {
+func loadRooms(id Id) map[Id]*Room {
 	rooms := make(map[Id]*Room, 0)
 	filename := filepath.Join("world", fmt.Sprintf("%s.yaml", id))
 	content, err := ioutil.ReadFile(filename)
@@ -43,12 +43,15 @@ func loadRooms(id Id) map[Id]*Locus {
 	if err != nil {
 		panic(fmt.Sprintf("Zone %s YAML is not valid: %s:", id, err))
 	}
-	nodes := make(map[Id]*Locus)
+	nodes := make(map[Id]*Room)
 	for rid, room := range rooms {
 		// Need to add id to room struct because it's a key rather than a field
-		// in YAML peristence.
+		// in YAML peristence. I'm going to regret this...
 		room.Id = "R" + rid
-		nodes[room.Id] = NewLocus(room)
+		for _, exit := range room.Exits {
+			exit.Destination = "R" + exit.Destination
+		}
+		nodes[room.Id] = room
 	}
 	return nodes
 }
@@ -85,35 +88,26 @@ func (z *Zone) loadZoneState() {
 	}
 	z.db = db
 	thingsById := LoadThings(z.db)
+	// actors contain a thing reference for their physical form
 	actorsById := LoadActors(z.db, thingsById)
-	z.Actors = make(map[Id]*Locus)
-	// Wrap everything in Locus objects to represent their placement
-	// within the game.
-	lociById := make(map[Id]*Locus)
-	for _, thing := range thingsById {
-		lociById[thing.ID()] = NewLocus(thing)
-	}
+	// add actors to rooms
+	z.Actors = make(map[Id]*Actor)
 	for _, actor := range actorsById {
-		actorLoc := NewLocus(actor)
-		lociById[actor.ID()] = actorLoc
-		// Also add actors to actor lookup map
-		z.Actors[actor.ID()] = actorLoc
+		z.Actors[actor.ID()] = actor
+		z.Rooms[actor.Body.ParentId].InsertActor(actor)
 	}
-	// Rooms are already wrapped, just add them to the big map
-	for _, room := range z.Rooms {
-		lociById[room.ID()] = room
-	}
-	// Create a tree of loci by adding every Locus to it's parent
-	for _, locus := range lociById {
-		pId := locus.Object.ParentID()
-		parent := lociById[pId]
-		if parent == nil {
-			if pId != "" {
-				log.Printf(fmt.Sprintf("WARN: object '%s' has an invalid parent '%s'", locus.ID(), pId))
-			}
-			continue
+	// add things to inventory, containers, or rooms
+	for _, thing := range thingsById {
+		switch IdTypeForId(thing.ParentId) {
+		case IdTypeRoom:
+			z.Rooms[thing.ParentId].Insert(thing)
+		case IdTypeInventory:
+			z.Actors[thing.ParentId].Insert(thing)
+		case IdTypeContainer:
+			thingsById[thing.ParentId].Insert(thing)
+		default:
+			log.Printf("Unable to find parent for %s with id %s", thing.Id, thing.ParentId)
 		}
-		parent.Insert(locus)
 	}
 }
 
@@ -122,10 +116,21 @@ func NewZone(id Id) (*Zone, error) {
 	zone := &Zone{
 		Id:     id,
 		Rooms:  loadRooms(id),
-		Actors: make(map[Id]*Locus),
+		Actors: make(map[Id]*Actor),
 	}
 	zone.loadZoneState()
 	return zone, nil
+}
+
+func (z *Zone) MoveActor(actor *Actor, room *Room) bool {
+	curRoom := actor.Room()
+	if curRoom != nil {
+		curRoom.RemoveActor(actor)
+	}
+	room.InsertActor(actor)
+	// In the future we might check any number of things,
+	// but for now always succeed.
+	return true
 }
 
 type ZoneManager struct {

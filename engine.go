@@ -118,13 +118,8 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 				req.Write("WTF")
 				return false
 			}
-
-			actorLoc := NewLocus(req.Actor)
-			zone.Actors[req.Actor.ID()] = actorLoc
-			if !zone.Rooms[Id("R1")].Insert(actorLoc) {
-				// TODO: this isn't what we should do!
-				panic("Can't insert actor into room!")
-			}
+			zone.Actors[req.Actor.ID()] = req.Actor
+			zone.Rooms[Id("R1")].InsertActor(req.Actor)
 			req.Actor.Zone = zone
 			e.sendPrompt(req)
 		}
@@ -138,8 +133,7 @@ func (e *Engine) sendPrompt(req *Request) {
 }
 
 func (e *Engine) dispatch(req *Request) {
-	room := req.Actor.Zone.Rooms[req.Actor.Body.Parent]
-	req.Cmd.ResolveWords(req.Actor.Zone.Actors[req.Actor.Id], room)
+	req.Cmd.ResolveWords(req.Actor.Room(), req.Actor)
 	if req.Cmd.Action == "" {
 		return
 	}

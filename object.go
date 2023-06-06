@@ -12,6 +12,26 @@ import (
 
 type Id string
 
+type IdType int
+
+const (
+	IdTypeRoom IdType = iota
+	IdTypeContainer
+	IdTypeInventory
+	IdTypeUnknown
+)
+
+func IdTypeForId(id Id) IdType {
+	if strings.HasPrefix(string(id), "R") {
+		return IdTypeRoom
+	} else if strings.HasPrefix(string(id), "C") {
+		return IdTypeContainer
+	} else if strings.HasPrefix(string(id), "A") {
+		return IdTypeInventory
+	}
+	return IdTypeUnknown
+}
+
 type ThingFlags int
 
 type MatchLevel int
@@ -24,81 +44,9 @@ const (
 	MatchExact
 )
 
-type GObject interface {
-	ID() Id
-	ParentID() Id
-	GetTitle() string
-	Take(obj GObject) bool
-}
-
-type Locus struct {
-	Parent   *Locus
-	Children []*Locus
-	Object   GObject
-}
-
-func NewLocus(obj GObject) *Locus {
-	return &Locus{
-		Children: make([]*Locus, 0),
-		Object:   obj,
-	}
-}
-
-func (n *Locus) Insert(child *Locus) bool {
-	if n.Object.Take(child.Object) {
-		if child.Parent != nil {
-			for i, o := range child.Parent.Children {
-				if o == child {
-					child.Parent.Children = append(child.Parent.Children[:i], child.Parent.Children[i+1:]...)
-				}
-			}
-		}
-		child.Parent = n
-		n.Children = append(n.Children, child)
-		return true
-	}
-	return false
-}
-
-func (l *Locus) ID() Id {
-	return l.Object.ID()
-}
-
-func (l *Locus) ParentID() Id {
-	return l.Object.ParentID()
-}
-
 type Attrib struct {
 	Real int
 	Cur  int
-}
-
-func (n *Locus) Match(word string) MatchLevel {
-	if n.Object.GetTitle() == word {
-		return MatchExact
-	}
-	if strings.HasPrefix(n.Object.GetTitle(), word) {
-		return MatchPrimary
-	}
-	if strings.Contains(n.Object.GetTitle(), word) {
-		return MatchPartial
-	}
-	return MatchNone
-}
-
-func (n *Locus) Find(word string) *Locus {
-	bestMatch := struct {
-		match MatchLevel
-		node  *Locus
-	}{match: MatchNone}
-	for _, child := range n.Children {
-		match := child.Match(word)
-		if match > bestMatch.match {
-			bestMatch.match = match
-			bestMatch.node = child
-		}
-	}
-	return bestMatch.node
 }
 
 // --------------------------------
@@ -110,27 +58,60 @@ type Thing struct {
 	Title      string
 	Desc       string
 	Durability Attrib
-	Parent     Id
+	Contents   []*Thing
+	ParentId   Id
 	Flags      ThingFlags
 	dirty      bool
-}
-
-func (t *Thing) GetTitle() string {
-	return t.Title
 }
 
 func (t *Thing) ID() Id {
 	return t.Id
 }
 
-func (t *Thing) ParentID() Id {
-	return t.Parent
-}
-
-func (t *Thing) Take(obj GObject) bool {
+func (t *Thing) Accept(child *Thing) bool {
 	// TODO: later this will actually check capacity
 	// but for now, anything can go in anything
 	return true
+}
+
+func (t *Thing) Match(word string) MatchLevel {
+	if t.Title == word {
+		return MatchExact
+	}
+	if strings.HasPrefix(t.Title, word) {
+		return MatchPrimary
+	}
+	if strings.Contains(t.Title, word) {
+		return MatchPartial
+	}
+	return MatchNone
+}
+
+func (t *Thing) Find(word string) *Thing {
+	bestMatch := struct {
+		match MatchLevel
+		thing *Thing
+	}{match: MatchNone}
+	for _, item := range t.Contents {
+		match := item.Match(word)
+		if match > bestMatch.match {
+			bestMatch.match = match
+			bestMatch.thing = item
+		}
+	}
+	return bestMatch.thing
+}
+
+func (t *Thing) Insert(child *Thing) {
+	t.Contents = append(t.Contents, child)
+}
+
+func (t *Thing) Remove(thing *Thing) {
+	for i, item := range t.Contents {
+		if item == thing {
+			t.Contents = append(t.Contents[:i], t.Contents[i+1:]...)
+		}
+	}
 }
 
 func DeserializeAttrib(s string) (Attrib, error) {
@@ -183,7 +164,7 @@ ORDER BY location`)
 		var (
 			attribs string
 		)
-		err = rows.Scan(&thing.Id, &attribs, &thing.Title, &thing.Desc, &thing.Parent, &thing.Flags)
+		err = rows.Scan(&thing.Id, &attribs, &thing.Title, &thing.Desc, &thing.ParentId, &thing.Flags)
 		if err != nil {
 			panic(fmt.Sprintf("Error while iterating rows: %s", err))
 		}

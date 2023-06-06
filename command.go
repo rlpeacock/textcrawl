@@ -11,8 +11,8 @@ type Command struct {
 	Action       string
 	Params       []string
 	Preposition  string
-	DirectObjs   []*Locus
-	IndirectObjs []*Locus
+	DirectObjs   []any
+	IndirectObjs []any
 }
 
 var translations = map[string][]string{
@@ -63,8 +63,8 @@ func NewCommand(text string) *Command {
 	return &Command{
 		Text:         strings.TrimSpace(text),
 		Preposition:  "",
-		DirectObjs:   make([]*Locus, 0),
-		IndirectObjs: make([]*Locus, 0),
+		DirectObjs:   make([]any, 0),
+		IndirectObjs: make([]any, 0),
 	}
 }
 
@@ -77,7 +77,7 @@ func TranslateAction(text string) (string, []string) {
 	return t[0], t[1:]
 }
 
-func (c *Command) ResolveWords(room *Locus, actor *Locus) error {
+func (c *Command) ResolveWords(room *Room, actor *Actor) error {
 	words := strings.Split(c.Text, " ")
 	c.Action, c.Params = TranslateAction(words[0])
 	for _, w := range words[1:] {
