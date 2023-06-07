@@ -109,6 +109,21 @@ func (a *Actor) Find(word string) *Thing {
 	return bestMatch.thing
 }
 
+func (a *Actor) Take(thing *Thing) bool {
+	return a.Zone.TakeThing(thing, a)
+}
+
+func (a *Actor) Drop(thing *Thing) bool {
+	room := a.Room()
+	// can't drop it if you don't have it
+	if thing.ParentId == a.ID() {
+		thing.ParentId = room.Id
+		room.Insert(thing)
+		return true
+	}
+	return false
+}
+
 func (a *Actor) Insert(child *Thing) {
 	a.Inventory = append(a.Inventory, child)
 }

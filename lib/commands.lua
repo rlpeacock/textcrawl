@@ -1,3 +1,4 @@
+
 function look(req)
    room = req.Actor:Room()
    req:Write(room.Desc .. "\n")
@@ -44,7 +45,7 @@ function take(req)
    else
 	  for i = 1, #req.Cmd.DirectObjs do
 		 obj = req.Cmd.DirectObjs[i]
-		 if req.Actor:Insert(obj) then
+		 if req.Actor:Take(obj) then
 			req:Write("You get the " .. obj.Title .. "\n")
 		 else
 			req:Write("You failed to take " .. obj.Title .. "\n")
@@ -53,13 +54,28 @@ function take(req)
    end
 end
 
+function drop( req )
+	if #req.Cmd.DirectObjs == 0 then
+		req:Write("Drop what?")
+	else
+	  for i = 1, #req.Cmd.DirectObjs do
+		 obj = req.Cmd.DirectObjs[i]
+		 if req.Actor:Drop(obj) then
+			req:Write("You dropped the " .. obj.Title .. "\n")
+		 else
+			req:Write("You failed to drop the " .. obj.Title .. "\n")
+		 end
+	  end
+	end
+end
+
 function drop(req)
    if #req.Cmd.DirectObjs == 0 then
 	  req:Write("Drop what?")
    else
 	  for i = 1, #req.Cmd.DirectObjs do
 		 obj = req.Cmd.DirectObjs[i]
-		 if req.Actor.Room:Insert(obj) then
+		 if req.Actor:Drop(obj) then
 			req:Write("You drop the " .. obj.Title .. "\n")
 		 else
 			req:Write("You failed to drop the " .. obj.Title .. "\n")

@@ -133,6 +133,23 @@ func (z *Zone) MoveActor(actor *Actor, room *Room) bool {
 	return true
 }
 
+func (z *Zone) TakeThing(thing *Thing, actor *Actor) bool {
+	idType := IdTypeForId(thing.ParentId)
+	if idType == IdTypeRoom {
+		room := z.Rooms[thing.ParentId]
+		room.Remove(thing)
+	} else if idType == IdTypeContainer {
+		// oh shit, I don't know how to find the container!
+	} else if idType == IdTypeInventory {
+		actor := z.Actors[thing.ParentId]
+		actor.Remove(thing)
+	}
+	thing.ParentId = actor.ID()
+	actor.Insert(thing)
+	// TODO: we'll eventually check various things, like capacity, etc.
+	return true
+}
+
 type ZoneManager struct {
 	zones map[Id]*Zone
 }
