@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	lua "github.com/yuin/gopher-lua"
@@ -23,6 +24,8 @@ const (
 	Connect MessageType = iota
 	Disconnect
 )
+
+const LuaEntrypoint = "lib/commands.lua"
 
 type Message struct {
 	mType  MessageType
@@ -75,11 +78,12 @@ type Engine struct {
 	reqsByActor map[Id][]*Request
 	zoneMgr     *ZoneManager
 	luaState    *lua.LState
+	loadTime 	time.Time
 }
 
 func NewEngine() *Engine {
 	ls := lua.NewState()
-	if err := ls.DoFile("lib/commands.lua"); err != nil {
+	if err := ls.DoFile(LuaEntrypoint); err != nil {
 		panic(fmt.Sprintf("Script execution failed: %s", err))
 	}
 
@@ -90,8 +94,11 @@ func NewEngine() *Engine {
 		reqsByActor: make(map[Id][]*Request),
 		zoneMgr:     GetZoneMgr(),
 		luaState:    ls,
+		loadTime:    time.Now(),
 	}
 }
+
+
 
 func (e *Engine) ensureLoggedIn(req *Request) bool {
 	switch req.Actor.Player.LoginState {
@@ -201,6 +208,21 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 		if len(q) > 0 {
 			todo = append(todo, q[0])
 			e.reqsByActor[id] = q[1:]
+		}
+	}
+	// check whether we need to reload the lua engine
+	info, err := os.Stat(LuaEntrypoint)
+	if err != nil {
+		panic("What happened to our lua library!")
+	}
+	if info.ModTime().After(e.loadTime) {
+		ls := lua.NewState()
+		err := ls.DoFile(LuaEntrypoint)
+		if err == nil {
+			e.luaState.Close()
+			e.luaState = ls
+		} else {
+			log.Printf("Unable to reload lua engine: %s", err)
 		}
 	}
 	// Go through and handle each request. TODO: we should order these
