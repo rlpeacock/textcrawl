@@ -1,18 +1,25 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 )
+
+type Noun struct {
+	Text string
+	Ref any
+}
+
+func NewNoun(text string, ref any) Noun {
+	return Noun{ text, ref }
+}
 
 type Command struct {
 	Text         string
 	Action       string
 	Params       []string
 	Preposition  string
-	DirectObjs   []any
-	IndirectObjs []any
+	DirectObjs   []Noun
+	IndirectObjs []Noun
 }
 
 var translations = map[string][]string{
@@ -63,8 +70,8 @@ func NewCommand(text string) *Command {
 	return &Command{
 		Text:         strings.TrimSpace(text),
 		Preposition:  "",
-		DirectObjs:   make([]any, 0),
-		IndirectObjs: make([]any, 0),
+		DirectObjs:   make([]Noun, 0),
+		IndirectObjs: make([]Noun, 0),
 	}
 }
 
@@ -77,7 +84,7 @@ func TranslateAction(text string) (string, []string) {
 	return t[0], t[1:]
 }
 
-func (c *Command) ResolveWords(room *Room, actor *Actor) error {
+func (c *Command) ResolveWords(room *Room, actor *Actor) {
 	words := strings.Split(c.Text, " ")
 	c.Action, c.Params = TranslateAction(words[0])
 	for _, w := range words[1:] {
@@ -86,25 +93,25 @@ func (c *Command) ResolveWords(room *Room, actor *Actor) error {
 		if entity == nil {
 			entity = actor.Find(w)
 		}
-		if entity != nil {
-			if c.Preposition == "" {
-				c.DirectObjs = append(c.DirectObjs, entity)
-			} else {
-				c.IndirectObjs = append(c.IndirectObjs, entity)
-			}
-		} else if c.Preposition == "" {
+		// if not an noun, maybe a preposition?
+		isPrep := false
+		if entity == nil && c.Preposition == "" && len(c.DirectObjs) > 0 {
 			for _, p := range prepositions {
 				if w == p {
 					c.Preposition = p
+					isPrep = true
 					break
 				}
 			}
-			if c.Preposition == "" {
-				return errors.New(fmt.Sprintf("What is '%s'?", w))
-			}
+		}
+		// we don't know what this thing is...add special 'unknown' object
+		if entity == nil && !isPrep {
+
+		}
+		if c.Preposition == "" {
+			c.DirectObjs = append(c.DirectObjs, NewNoun(w, entity))
 		} else {
-			return errors.New(fmt.Sprintf("What is '%s'?", w))
+			c.IndirectObjs = append(c.IndirectObjs, NewNoun(w, entity))
 		}
 	}
-	return nil
 }

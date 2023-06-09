@@ -40,54 +40,47 @@ function goDirection(req, dir)
 end
 
 function take(req)
-   if #req.Cmd.DirectObjs == 0 then
-	  req:Write("Take what?")
-   else
-	  for i = 1, #req.Cmd.DirectObjs do
-		 obj = req.Cmd.DirectObjs[i]
-		 if req.Actor:Take(obj) then
-			req:Write("You get the " .. obj.Title .. "\n")
-		 else
-			req:Write("You failed to take " .. obj.Title .. "\n")
-		 end
-	  end
-   end
+	if #req.Cmd.DirectObjs == 0 then
+		req:Write("Take what?")
+	else
+		for i = 1, #req.Cmd.DirectObjs do
+			obj = req.Cmd.DirectObjs[i]
+			if obj.Ref then
+				if req.Actor:Take(obj.Ref) then
+					req:Write("You get the " .. obj.Ref.Title .. "\n")
+				else
+					req:Write("You failed to take " .. obj.Ref.Title .. "\n")
+				end
+			else
+				req:Write("I don't see a " .. obj.Text .. " here\n")
+			end
+		end
+	end
 end
 
 function drop( req )
 	if #req.Cmd.DirectObjs == 0 then
 		req:Write("Drop what?")
 	else
-	  for i = 1, #req.Cmd.DirectObjs do
-		 obj = req.Cmd.DirectObjs[i]
-		 if req.Actor:Drop(obj) then
-			req:Write("You dropped the " .. obj.Title .. "\n")
-		 else
-			req:Write("You failed to drop the " .. obj.Title .. "\n")
-		 end
-	  end
+		for i = 1, #req.Cmd.DirectObjs do
+			obj = req.Cmd.DirectObjs[i]
+			if obj.Ref then
+				if req.Actor:Drop(obj.Ref) then
+				req:Write("You dropped the " .. obj.Ref.Title .. "\n")
+				else
+				req:Write("You failed to drop the " .. obj.Ref.Title .. "\n")
+				end
+			else
+				req:Write("You don't have a " .. obj.Text .. "\n")
+	  		end
+		end
 	end
-end
-
-function drop(req)
-   if #req.Cmd.DirectObjs == 0 then
-	  req:Write("Drop what?")
-   else
-	  for i = 1, #req.Cmd.DirectObjs do
-		 obj = req.Cmd.DirectObjs[i]
-		 if req.Actor:Drop(obj) then
-			req:Write("You drop the " .. obj.Title .. "\n")
-		 else
-			req:Write("You failed to drop the " .. obj.Title .. "\n")
-		 end
-	  end
-   end
 end
 
 function inventory(req)
    req:Write("You have:\n")
    for i = 1, #req.Actor.Body.Contents do
-	  req:Write(req.Actor.Body.Contents[i].Title .. "\n")
+	  req:Write("* " .. req.Actor.Body.Contents[i].Title .. "\n")
    end
 end
 

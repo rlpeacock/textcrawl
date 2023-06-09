@@ -41,7 +41,6 @@ type Actor struct {
 	Stats     *Stats
 	Zone      *Zone
 	Player    *Player
-	Inventory []*Thing
 }
 
 func NewActor(id string, player *Player) *Actor {
@@ -50,6 +49,7 @@ func NewActor(id string, player *Player) *Actor {
 		Player: player,
 		Body: &Thing{
 			Title: "yourself",
+			Contents: make([]*Thing,0),
 		},
 	}
 }
@@ -99,7 +99,7 @@ func (a *Actor) Find(word string) *Thing {
 		match MatchLevel
 		thing *Thing
 	}{match: MatchNone}
-	for _, item := range a.Inventory {
+	for _, item := range a.Body.Contents {
 		match := item.Match(word)
 		if match > bestMatch.match {
 			bestMatch.match = match
@@ -115,9 +115,8 @@ func (a *Actor) Take(thing *Thing) bool {
 
 func (a *Actor) Drop(thing *Thing) bool {
 	room := a.Room()
-	// can't drop it if you don't have it
-	if thing.ParentId == a.ID() {
-		thing.ParentId = room.Id
+	thing.ParentId = room.Id
+	if a.Body.Remove(thing) {
 		room.Insert(thing)
 		return true
 	}
@@ -125,15 +124,11 @@ func (a *Actor) Drop(thing *Thing) bool {
 }
 
 func (a *Actor) Insert(child *Thing) {
-	a.Inventory = append(a.Inventory, child)
+	a.Body.Insert(child)
 }
 
 func (a *Actor) Remove(thing *Thing) {
-	for i, item := range a.Inventory {
-		if item == thing {
-			a.Inventory = append(a.Inventory[:i], a.Inventory[i+1:]...)
-		}
-	}
+	a.Body.Remove(thing)
 }
 
 // Load all actors from SQLite DB

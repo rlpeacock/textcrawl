@@ -64,6 +64,12 @@ type Thing struct {
 	dirty      bool
 }
 
+func NewThing() *Thing {
+	return &Thing{
+		Contents: make([]*Thing, 0),
+	}
+}
+
 func (t *Thing) ID() Id {
 	return t.Id
 }
@@ -106,12 +112,14 @@ func (t *Thing) Insert(child *Thing) {
 	t.Contents = append(t.Contents, child)
 }
 
-func (t *Thing) Remove(thing *Thing) {
+func (t *Thing) Remove(thing *Thing) bool {
 	for i, item := range t.Contents {
 		if item == thing {
 			t.Contents = append(t.Contents[:i], t.Contents[i+1:]...)
+			return true
 		}
 	}
+	return false
 }
 
 func DeserializeAttrib(s string) (Attrib, error) {
@@ -160,7 +168,7 @@ ORDER BY location`)
 	defer rows.Close()
 	things := make(map[Id]*Thing, 0)
 	for rows.Next() {
-		thing := Thing{}
+		thing := NewThing()
 		var (
 			attribs string
 		)
@@ -169,7 +177,7 @@ ORDER BY location`)
 			panic(fmt.Sprintf("Error while iterating rows: %s", err))
 		}
 		DeserializeAttribList(attribs, &thing.Weight, &thing.Size, &thing.Durability)
-		things[thing.Id] = &thing
+		things[thing.Id] = thing
 	}
 	err = rows.Err()
 	if err != nil {
