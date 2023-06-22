@@ -36,11 +36,11 @@ type Stats struct {
 // holds attributes of the actor outside of it's actual place
 // in the game. That is represented by the 'body' attribute.
 type Actor struct {
-	Id        Id
-	Body      *Thing
-	Stats     *Stats
-	Zone      *Zone
-	Player    *Player
+	Id     Id
+	Body   *Thing
+	Stats  *Stats
+	Zone   *Zone
+	Player *Player
 }
 
 func NewActor(id string, player *Player) *Actor {
@@ -48,8 +48,8 @@ func NewActor(id string, player *Player) *Actor {
 		Id:     Id(id),
 		Player: player,
 		Body: &Thing{
-			Title: "yourself",
-			Contents: make([]*Thing,0),
+			Title:    "yourself",
+			Contents: make([]*Thing, 0),
 		},
 	}
 }
@@ -94,10 +94,10 @@ func (a *Actor) Match(word string) MatchLevel {
 	return MatchNone
 }
 
-func (a *Actor) Find(word string) *Thing {
+func (a *Actor) Find(word string) interface{} {
 	bestMatch := struct {
 		match MatchLevel
-		thing *Thing
+		thing interface{}
 	}{match: MatchNone}
 	for _, item := range a.Body.Contents {
 		match := item.Match(word)

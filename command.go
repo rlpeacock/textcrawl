@@ -6,11 +6,11 @@ import (
 
 type Noun struct {
 	Text string
-	Ref any
+	Ref  any
 }
 
 func NewNoun(text string, ref any) Noun {
-	return Noun{ text, ref }
+	return Noun{text, ref}
 }
 
 type Command struct {
@@ -87,27 +87,25 @@ func TranslateAction(text string) (string, []string) {
 func (c *Command) ResolveWords(room *Room, actor *Actor) {
 	words := strings.Split(c.Text, " ")
 	c.Action, c.Params = TranslateAction(words[0])
+words:
 	for _, w := range words[1:] {
 		entity := room.Find(w)
 		// if not in room, check actor's inventory
 		if entity == nil {
 			entity = actor.Find(w)
 		}
-		// if not an noun, maybe a preposition?
-		isPrep := false
+		// if not a noun, maybe a preposition?
 		if entity == nil && c.Preposition == "" && len(c.DirectObjs) > 0 {
 			for _, p := range prepositions {
 				if w == p {
 					c.Preposition = p
-					isPrep = true
-					break
+					continue words
 				}
 			}
 		}
-		// we don't know what this thing is...add special 'unknown' object
-		if entity == nil && !isPrep {
-
-		}
+		// TODO: we don't know what this thing is...add special 'unknown' object?
+		// if entity == nil {
+		// }
 		if c.Preposition == "" {
 			c.DirectObjs = append(c.DirectObjs, NewNoun(w, entity))
 		} else {
