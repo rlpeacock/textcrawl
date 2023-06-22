@@ -10,8 +10,13 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// An Id is a unique identifier.
+// Ids are unique across entities.
+// They start with a prefix which indicates entity type.
+// (e.g. rooms all start with R)
 type Id string
 
+// Specifies what type of object is referred to by an Id
 type IdType int
 
 const (
@@ -21,6 +26,9 @@ const (
 	IdTypeUnknown
 )
 
+// Returns what type of object a given Id refers to.
+// TODO: this is a workaround for lack of polymorphism.
+// What's a more idiomatic way of doing stuff like this?
 func IdTypeForId(id Id) IdType {
 	if strings.HasPrefix(string(id), "R") {
 		return IdTypeRoom
@@ -32,8 +40,11 @@ func IdTypeForId(id Id) IdType {
 	return IdTypeUnknown
 }
 
+// Bit flags indicating state or features on a thing.
 type ThingFlags int
 
+// A type for specifying how close a match has matched.
+// We use this for looking up what objects words refer to.
 type MatchLevel int
 
 // to indicate how closely a word matches the object's title
@@ -44,6 +55,10 @@ const (
 	MatchExact
 )
 
+// An Attrib holds a trait for an Actor or Thing.
+// It has 2 components:
+//   - the maximum, or healthy, value
+//   - what the value currently is
 type Attrib struct {
 	Real int
 	Cur  int
@@ -51,6 +66,10 @@ type Attrib struct {
 
 // --------------------------------
 
+// A Thing is a physical object within the game.
+// Things can contain other things
+// and are themselves contained,
+// either by another thing or by a room.
 type Thing struct {
 	Id         Id
 	Weight     Attrib
@@ -64,22 +83,27 @@ type Thing struct {
 	dirty      bool
 }
 
+// Create a generic thing.
 func NewThing() *Thing {
 	return &Thing{
 		Contents: make([]*Thing, 0),
 	}
 }
 
+// Return the thing's ID.
+// This is a method because we'll be calling it from Lua where polymorphism actually works.
 func (t *Thing) ID() Id {
 	return t.Id
 }
 
+// Determine whether the supplied thing can be contained within this thing.
 func (t *Thing) Accept(child *Thing) bool {
 	// TODO: later this will actually check capacity
 	// but for now, anything can go in anything
 	return true
 }
 
+// How closely does this word match the title of this thing?
 func (t *Thing) Match(word string) MatchLevel {
 	if t.Title == word {
 		return MatchExact
@@ -93,6 +117,7 @@ func (t *Thing) Match(word string) MatchLevel {
 	return MatchNone
 }
 
+// Search the contents of this thing for something that matches the supplied word.
 func (t *Thing) Find(word string) *Thing {
 	bestMatch := struct {
 		match MatchLevel
@@ -110,12 +135,14 @@ func (t *Thing) Find(word string) *Thing {
 
 func (t *Thing) Insert(child *Thing) {
 	t.Contents = append(t.Contents, child)
+	t.dirty = true
 }
 
 func (t *Thing) Remove(thing *Thing) bool {
 	for i, item := range t.Contents {
 		if item == thing {
 			t.Contents = append(t.Contents[:i], t.Contents[i+1:]...)
+			t.dirty = true
 			return true
 		}
 	}
