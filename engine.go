@@ -17,7 +17,7 @@ import (
 // one by one. After all events are processed, it will generate responses
 // and send them to a channel that the reader thread is selecting on
 
-// Message types the engine can handle
+// MessageType message types the engine can handle
 type MessageType int
 
 const (
@@ -48,7 +48,8 @@ type Request struct {
 }
 
 func (r *Request) Write(msg string) {
-	r.Writer.Write([]byte(msg))
+	// Ignore errors for now. Not clear what we can do. Possibly add a counter to track eventually.
+	_, _ = r.Writer.Write([]byte(msg))
 }
 
 func NewRequest(actor *Actor, writer io.Writer, cmd *Command) *Request {
@@ -88,9 +89,9 @@ func NewEngine() *Engine {
 	}
 
 	return &Engine{
-		RequestCh:   make(chan *Request, 0),
-		HeartbeatCh: make(chan *Heartbeat, 0),
-		MessageCh:   make(chan Message, 0),
+		RequestCh:   make(chan *Request),
+		HeartbeatCh: make(chan *Heartbeat),
+		MessageCh:   make(chan Message),
 		reqsByActor: make(map[Id][]*Request),
 		zoneMgr:     GetZoneMgr(),
 		luaState:    ls,
@@ -119,14 +120,14 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 			req.Write("Login successful\n")
 			req.Actor.Player.LoginState = LoginStateLoggedIn
 			// TODO: we also don't have persistent sessions so give an arbitrary location
-			zone, err := e.zoneMgr.GetZone(Id("1"))
+			zone, err := e.zoneMgr.GetZone("1")
 			if err != nil {
 				log.Printf("Zone get failed: %s", err)
 				req.Write("WTF")
 				return false
 			}
 			zone.Actors[req.Actor.ID()] = req.Actor
-			zone.Rooms[Id("R1")].InsertActor(req.Actor)
+			zone.Rooms[("R1")].InsertActor(req.Actor)
 			req.Actor.Zone = zone
 			e.sendPrompt(req)
 		}
@@ -160,7 +161,7 @@ func (e *Engine) dispatch(req *Request) {
 	e.sendPrompt(req)
 }
 
-// We queue up requests for each actor. When we receive a
+// Run We queue up requests for each actor. When we receive a
 // heartbeat message, we process the events we've received.
 // Generally this means taking the first message from each
 // actor.
@@ -227,9 +228,19 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 	}
 	// Go through and handle each request. TODO: we should order these
 	// by init value and account for multi-tick actions.
+	zoneIds := make(map[Id]bool)
 	for _, req := range todo {
 		log.Print(fmt.Sprintf("processing: %s (%d)\r\n", req.Cmd.Action, hb.tick))
 		e.dispatch(req)
+		zoneIds[req.Actor.Zone.Id] = true
+	}
+	// Now save any zones in which actions have occurred
+	for zid, _ := range zoneIds {
+		zone, err := e.zoneMgr.GetZone(zid)
+		if err != nil {
+			panic(fmt.Sprintf("WTF, no zone %s", zid))
+		}
+		zone.Save()
 	}
 }
 

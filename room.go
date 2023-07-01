@@ -1,9 +1,11 @@
 package main
 
-// A cardinal direction
+import "database/sql"
+
+// Direction A cardinal direction
 type Direction string
 
-// Kind of movement
+// MoveType Kind of movement
 // (e.g. walk, fly, swim)
 type MoveType string
 
@@ -28,7 +30,7 @@ type Room struct {
 	dirty  bool
 }
 
-// Gets the Exit associated with a particular direction, if any.
+// GetExit Gets the Exit associated with a particular direction, if any.
 func (r *Room) GetExit(d Direction) *Exit {
 	for _, e := range r.Exits {
 		if e.Direction == d {
@@ -38,22 +40,22 @@ func (r *Room) GetExit(d Direction) *Exit {
 	return nil
 }
 
-// Determines whether the supplied thing can be placed within this room.
+// AcceptThing Determines whether the supplied thing can be placed within this room.
 // Eventual reasons for not might include:
 //   - the object is too big
 //   - the room is full
 //   - magic
-func (r *Room) AcceptThing(t *Thing) bool {
+func (r *Room) AcceptThing(_ *Thing) bool {
 	return true
 }
 
-// Determines whether the supplied actor can be placed within the room.
+// AcceptActor Determines whether the supplied actor can be placed within the room.
 // See [AcceptThing] for reasons why it might not.
-func (r *Room) AcceptActor(a *Actor) bool {
+func (r *Room) AcceptActor(_ *Actor) bool {
 	return true
 }
 
-// Search the room for objects which match the supplied word.
+// Find Search the room for objects which match the supplied word.
 func (r *Room) Find(word string) interface{} {
 	bestMatch := struct {
 		match   MatchLevel
@@ -76,13 +78,13 @@ func (r *Room) Find(word string) interface{} {
 	return bestMatch.matched
 }
 
-// Unconditionally add an actor to the room
+// InsertActor Unconditionally add an actor to the room
 func (r *Room) InsertActor(actor *Actor) {
 	actor.SetRoom(r)
 	r.Actors = append(r.Actors, actor)
 }
 
-// Unconditionally remove an actor from the room.
+// RemoveActor Unconditionally remove an actor from the room.
 func (r *Room) RemoveActor(actor *Actor) {
 	for i, item := range r.Actors {
 		if item == actor {
@@ -91,14 +93,14 @@ func (r *Room) RemoveActor(actor *Actor) {
 	}
 }
 
-// Unconditionally add a thing to the room.
+// Insert Unconditionally add a thing to the room.
 func (r *Room) Insert(thing *Thing) {
 	thing.ParentId = r.Id
 	r.Things = append(r.Things, thing)
 	r.dirty = true
 }
 
-// Unconditionally remove a thing from the room.
+// Remove Unconditionally remove a thing from the room.
 func (r *Room) Remove(thing *Thing) {
 	for i, item := range r.Things {
 		if item == thing {
@@ -106,4 +108,16 @@ func (r *Room) Remove(thing *Thing) {
 			r.dirty = true
 		}
 	}
+}
+
+func (r *Room) Save(db *sql.DB) error {
+	// TODO: the player's actor is currently not in the databases, which causes
+	// saves to fail!
+	for _, actor := range r.Actors {
+		err := actor.Save(db)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

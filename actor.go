@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -48,7 +49,7 @@ type Actor struct {
 	dirty  bool    // whether the actor has been modified from initial state
 }
 
-// Returns a generic actor
+// NewActor Returns a generic actor
 func NewActor(id string, player *Player) *Actor {
 	return &Actor{
 		Id:     Id(id),
@@ -60,7 +61,7 @@ func NewActor(id string, player *Player) *Actor {
 	}
 }
 
-// Returns the ID associated with this actor.
+// ID Returns the ID associated with this actor.
 // Note that while the actor has an ID, this is not it.
 // Why? Because when we load from persistence,
 // We need to be able to find the body to contain it's inventory.
@@ -69,13 +70,13 @@ func (a *Actor) ID() Id {
 	return a.Body.Id
 }
 
-// Modifies the actor's body's location
+// SetRoom Modifies the actor's body's location
 func (a *Actor) SetRoom(r *Room) {
 	a.Body.ParentId = r.Id
 	a.dirty = true
 }
 
-// Gets a title for the actor.
+// GetTitle Gets a title for the actor.
 // Note that the title actually comes from the body.
 // TODO: I don't remember why this is this way.
 // Can we stop doing this?
@@ -83,20 +84,20 @@ func (a *Actor) GetTitle() string {
 	return a.Body.Title
 }
 
-// Will this actor accept possession of supplied object?
-func (a *Actor) Accept(thing Thing) bool {
+// Accept Will this actor accept possession of supplied object?
+func (a *Actor) Accept(_ Thing) bool {
 	// TODO: check carrying capacity but for now can carry anything
 	return true
 }
 
-// Return object holding position of actor within the object hierarchy.
+// Room Return object holding position of actor within the object hierarchy.
 // This is currently a room, but conceivably someday it could be another
 // Thing.
 func (a *Actor) Room() *Room {
 	return a.Zone.GetRoom(a.Body.ParentId)
 }
 
-// Determine how closely a word matches the title of this actor.
+// Match Determine how closely a word matches the title of this actor.
 func (a *Actor) Match(word string) MatchLevel {
 	if a.GetTitle() == word {
 		return MatchExact
@@ -110,7 +111,7 @@ func (a *Actor) Match(word string) MatchLevel {
 	return MatchNone
 }
 
-// Search actor's inventory to see if it contains an object that matches this word.
+// Find Search actor's inventory to see if it contains an object that matches this word.
 // If multiple objects match, it will return the closest match. In cases of tie,
 // the first match is returned.
 func (a *Actor) Find(word string) interface{} {
@@ -128,13 +129,13 @@ func (a *Actor) Find(word string) interface{} {
 	return bestMatch.thing
 }
 
-// Attempt to place a thing in the actor's inventory.
+// Take Attempt to place a thing in the actor's inventory.
 // Returns whether the attempt succeeded.
 func (a *Actor) Take(thing *Thing) bool {
 	return a.Zone.TakeThing(thing, a)
 }
 
-// Attempt to drop something from the actor's inventory into the current room.
+// Drop Attempt to drop something from the actor's inventory into the current room.
 // Returns whether the attempt succeeded.
 func (a *Actor) Drop(thing *Thing) bool {
 	room := a.Room()
@@ -147,25 +148,25 @@ func (a *Actor) Drop(thing *Thing) bool {
 	return false
 }
 
-// Unconditionally add something to the actor's inventory.
+// Insert Unconditionally add something to the actor's inventory.
 func (a *Actor) Insert(child *Thing) {
 	a.Body.Insert(child)
 }
 
-// Unconditionally remove something from the actor's inventory.
+// Remove Unconditionally remove something from the actor's inventory.
 func (a *Actor) Remove(thing *Thing) {
 	a.Body.Remove(thing)
 }
 
-// Load all actors from SQLite DB
+// LoadActors Load all actors from SQLite DB
 func LoadActors(db *sql.DB, things map[Id]*Thing) map[Id]*Actor {
-	rows, err := db.Query(`
-SELECT a.id, thing_id, stats
-FROM actor a JOIN thing t ON a.thing_id = t.id`)
+	rows, err := db.Query(`SELECT a.id, thing_id, stats FROM actor a JOIN thing t ON a.thing_id = t.id`)
 	if err != nil {
 		panic(fmt.Sprintf("Oh shit, the database is screwed up! Error: %s", err))
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 	actors := make(map[Id]*Actor)
 	for rows.Next() {
 		actor := Actor{}
@@ -188,6 +189,7 @@ FROM actor a JOIN thing t ON a.thing_id = t.id`)
 			log.Printf("WARN: error loading actors %s: %s", actor.Id, err)
 			continue
 		}
+		actor.Stats = &stats
 		actors[actor.Id] = &actor
 	}
 	err = rows.Err()
@@ -195,4 +197,27 @@ FROM actor a JOIN thing t ON a.thing_id = t.id`)
 		panic(fmt.Sprintf("Error while iterating rows: %s", err))
 	}
 	return actors
+}
+
+func (a *Actor) Save(db *sql.DB) error {
+	err := a.Body.Save(db)
+	if err != nil {
+		return err
+	}
+	if ! a.dirty {
+		return nil
+	}
+	stats := a.Stats
+	attribs := SerializeAttribList(stats.Str, stats.Dex, stats.Int, stats.Will, stats.Health, stats.Mind)
+	res, err := db.Exec(`UPDATE actor SET stats = ? WHERE id = ?`, attribs, a.Id)
+	if err != nil {
+		return err
+	}
+	rows, _ := res.RowsAffected()
+	if rows != 1 {
+		log.Printf("Something went wrong with update to %s. %d rows were updated rather than 1.", a.Id, rows)
+		return errors.New(fmt.Sprintf("unexpected update result when saving thing %s: %d rows affected", a.Id, rows))
+	}
+	a.dirty = false
+	return nil
 }

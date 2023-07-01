@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -33,9 +32,9 @@ func (z *Zone) GetRoom(id Id) *Room {
 }
 
 func loadRooms(id Id) map[Id]*Room {
-	rooms := make(map[Id]*Room, 0)
+	rooms := make(map[Id]*Room)
 	filename := filepath.Join("world", fmt.Sprintf("%s.yaml", id))
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to read zone file for zone %s: %s", id, err))
 	}
@@ -62,12 +61,22 @@ func ensureZoneDB(destFile string) {
 		if err != nil {
 			panic(fmt.Sprintf("Unable to create db %s: %s", destFile, err))
 		}
-		defer newFile.Close()
+		defer func(newFile *os.File) {
+			err := newFile.Close()
+			if err != nil {
+				panic(fmt.Sprintf("Failed to close the db file %s: %s", destFile, err))
+			}
+		}(newFile)
 		template, err := os.Open("world/0.dat")
 		if err != nil {
 			panic(fmt.Sprintf("Could not find template file for creating new zone: %s", err))
 		}
-		defer template.Close()
+		defer func(template *os.File) {
+			err := template.Close()
+			if err != nil {
+				panic(fmt.Sprintf("Failed to close the template file: %s", err))
+			}
+		}(template)
 		nBytes, err := io.Copy(newFile, template)
 		if err != nil || nBytes == 0 {
 			panic(fmt.Sprintf("Failed to make a new version of zone db: %s", err))
@@ -148,6 +157,25 @@ func (z *Zone) TakeThing(thing *Thing, actor *Actor) bool {
 	actor.Insert(thing)
 	// TODO: we'll eventually check various things, like capacity, etc.
 	return true
+}
+
+func (z *Zone) Save() {
+	trans, err := z.db.Begin()
+	if err != nil {
+		panic(fmt.Sprintf("Unable to create a transaction in which to save state for zone %s: %s", z.Id, err))
+	}
+	defer func(trans *sql.Tx) {
+		err := trans.Commit()
+		if err != nil {
+			panic(fmt.Sprintf("Unable to commit transaction for zone %s: %s", z.Id, err))
+		}
+	}(trans)
+	for _, room := range z.Rooms {
+		err := room.Save(z.db)
+		if err != nil {
+			panic(fmt.Sprintf("Unable to save state for zone %s: %s", z.Id, err))
+		}
+	}
 }
 
 type ZoneManager struct {

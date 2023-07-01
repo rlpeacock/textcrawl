@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -16,7 +17,7 @@ import (
 // (e.g. rooms all start with R)
 type Id string
 
-// Specifies what type of object is referred to by an Id
+// IdType Specifies what type of object is referred to by an Id
 type IdType int
 
 const (
@@ -26,7 +27,7 @@ const (
 	IdTypeUnknown
 )
 
-// Returns what type of object a given Id refers to.
+// IdTypeForId Returns what type of object a given Id refers to.
 // TODO: this is a workaround for lack of polymorphism.
 // What's a more idiomatic way of doing stuff like this?
 func IdTypeForId(id Id) IdType {
@@ -40,10 +41,10 @@ func IdTypeForId(id Id) IdType {
 	return IdTypeUnknown
 }
 
-// Bit flags indicating state or features on a thing.
+// ThingFlags Bit flags indicating state or features on a thing.
 type ThingFlags int
 
-// A type for specifying how close a match has matched.
+// MatchLevel A type for specifying how close a match has matched.
 // We use this for looking up what objects words refer to.
 type MatchLevel int
 
@@ -83,27 +84,27 @@ type Thing struct {
 	dirty      bool
 }
 
-// Create a generic thing.
+// NewThing Create a generic thing.
 func NewThing() *Thing {
 	return &Thing{
 		Contents: make([]*Thing, 0),
 	}
 }
 
-// Return the thing's ID.
+// ID Return the thing's ID.
 // This is a method because we'll be calling it from Lua where polymorphism actually works.
 func (t *Thing) ID() Id {
 	return t.Id
 }
 
-// Determine whether the supplied thing can be contained within this thing.
-func (t *Thing) Accept(child *Thing) bool {
+// Accept Determine whether the supplied thing can be contained within this thing.
+func (t *Thing) Accept(_ *Thing) bool {
 	// TODO: later this will actually check capacity
 	// but for now, anything can go in anything
 	return true
 }
 
-// How closely does this word match the title of this thing?
+// Match How closely does this word match the title of this thing?
 func (t *Thing) Match(word string) MatchLevel {
 	if t.Title == word {
 		return MatchExact
@@ -117,7 +118,7 @@ func (t *Thing) Match(word string) MatchLevel {
 	return MatchNone
 }
 
-// Search the contents of this thing for something that matches the supplied word.
+// Find Search the contents of this thing for something that matches the supplied word.
 func (t *Thing) Find(word string) *Thing {
 	bestMatch := struct {
 		match MatchLevel
@@ -149,22 +150,32 @@ func (t *Thing) Remove(thing *Thing) bool {
 	return false
 }
 
+func SerializeAttrib(attrib Attrib) string {
+	return fmt.Sprintf("%d:%d", attrib.Real, attrib.Cur)
+}
 func DeserializeAttrib(s string) (Attrib, error) {
 	parts := strings.Split(s, ":")
 	if len(parts) != 2 {
-		return Attrib{}, errors.New("Malformed attribute: missing delimiter")
+		return Attrib{}, errors.New("malformed attribute: missing delimiter")
 	}
-	real, err := strconv.Atoi(parts[0])
+	realVal, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return Attrib{}, errors.New("Malformed attribute: real is not a number")
+		return Attrib{}, errors.New("malformed attribute: realVal is not a number")
 	}
-	cur, err := strconv.Atoi(parts[1])
+	curVal, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return Attrib{}, errors.New("Malformed attribute: cur is not a number")
+		return Attrib{}, errors.New("malformed attribute: curVal is not a number")
 	}
-	return Attrib{real, cur}, nil
+	return Attrib{realVal, curVal}, nil
 }
 
+func SerializeAttribList(attribs ...Attrib) string {
+	serialized := ""
+	for _, attrib := range attribs {
+		serialized = serialized + "," + SerializeAttrib(attrib)
+	}
+	return serialized
+}
 func DeserializeAttribList(attribStr string, attribs ...*Attrib) error {
 	rawAttribs := strings.Split(attribStr, ",")
 	if len(rawAttribs) < len(attribs) {
@@ -192,8 +203,10 @@ ORDER BY location`)
 	if err != nil {
 		panic(fmt.Sprintf("Oh shit, the database is screwed up! Error: %s", err))
 	}
-	defer rows.Close()
-	things := make(map[Id]*Thing, 0)
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
+	things := make(map[Id]*Thing)
 	for rows.Next() {
 		thing := NewThing()
 		var (
@@ -203,7 +216,11 @@ ORDER BY location`)
 		if err != nil {
 			panic(fmt.Sprintf("Error while iterating rows: %s", err))
 		}
-		DeserializeAttribList(attribs, &thing.Weight, &thing.Size, &thing.Durability)
+		err = DeserializeAttribList(attribs, &thing.Weight, &thing.Size, &thing.Durability)
+		if err != nil {
+			log.Printf("Failed to deserialize attributes for object %s", thing.Id)
+			continue
+		}
 		things[thing.Id] = thing
 	}
 	err = rows.Err()
@@ -211,4 +228,28 @@ ORDER BY location`)
 		panic(fmt.Sprintf("Error while iterating rows: %s", err))
 	}
 	return things
+}
+
+func (t *Thing) Save(db *sql.DB) error {
+	for _, child := range t.Contents {
+		err := child.Save(db)
+		if err != nil {
+			return err
+		}
+	}
+	if !t.dirty {
+		return nil
+	}
+	attribs := SerializeAttribList(t.Weight, t.Size, t.Durability)
+	res, err := db.Exec(`UPDATE thing SET attributes = ?, location = ?, flags =? WHERE id = ?`, attribs, t.ParentId, t.Id)
+	if err != nil {
+		return err
+	}
+	rows, _ := res.RowsAffected()
+	if rows != 1 {
+		log.Printf("Something went wrong with update to %s. %d rows were updated rather than 1.", t.Id, rows)
+		return errors.New(fmt.Sprintf("unexpected update result when saving t %s: %d rows affected", t.Id, rows))
+	}
+	t.dirty = false
+	return nil
 }
