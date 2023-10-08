@@ -5,7 +5,11 @@ import (
 )
 
 func TestGetZone(t *testing.T) {
-	z, e := GetZoneMgr().GetZone(Id("1"))
+	zm, e := GetZoneMgr()
+	if e != nil {
+		t.Errorf("GetZoneMgr returned an error: %s", e)
+	}
+	z, e := zm.GetZone(Id("1"))
 	if e != nil {
 		t.Errorf("GetZoneMgr().GetZone(Id(1)) returned an error: %s", e)
 	}

@@ -77,9 +77,10 @@ type Engine struct {
 	HeartbeatCh chan *Heartbeat
 	MessageCh   chan Message
 	reqsByActor map[Id][]*Request
+	playerMgr   *PlayerMgr
 	zoneMgr     *ZoneManager
 	luaState    *lua.LState
-	loadTime 	time.Time
+	loadTime    time.Time
 }
 
 func NewEngine() *Engine {
@@ -87,19 +88,22 @@ func NewEngine() *Engine {
 	if err := ls.DoFile(LuaEntrypoint); err != nil {
 		panic(fmt.Sprintf("Script execution failed: %s", err))
 	}
+	zm, err := GetZoneMgr()
+	if err != nil {
+		log.Fatalf("Unable to start engine: %s", err)
+	}
 
 	return &Engine{
 		RequestCh:   make(chan *Request),
 		HeartbeatCh: make(chan *Heartbeat),
 		MessageCh:   make(chan Message),
 		reqsByActor: make(map[Id][]*Request),
-		zoneMgr:     GetZoneMgr(),
+		playerMgr:   NewPlayerMgr(),
+		zoneMgr:     zm,
 		luaState:    ls,
 		loadTime:    time.Now(),
 	}
 }
-
-
 
 func (e *Engine) ensureLoggedIn(req *Request) bool {
 	switch req.Actor.Player.LoginState {
@@ -117,19 +121,27 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 	case LoginStateWantPwd:
 		if req.Cmd.Text != "" {
 			// TODO: for now, we don't actually have passwords!
-			req.Write("Login successful\n")
-			req.Actor.Player.LoginState = LoginStateLoggedIn
-			// TODO: we also don't have persistent sessions so give an arbitrary location
-			zone, err := e.zoneMgr.GetZone("1")
+			player, actorId, err := e.playerMgr.LookupPlayer(req.Actor.Player.Username, "")
 			if err != nil {
-				log.Printf("Zone get failed: %s", err)
-				req.Write("WTF")
+				log.Printf("Player lookup failed: %s", err)
+				req.Write("I'm sorry...who?")
+				e.sendPrompt(req)
 				return false
 			}
-			zone.Actors[req.Actor.ID()] = req.Actor
-			zone.Rooms[("R1")].InsertActor(req.Actor)
-			req.Actor.Zone = zone
+			actor, err := e.zoneMgr.FindActor(actorId)
+			if err != nil {
+				log.Printf("Player actor lookup failed: %s", err)
+				req.Write("I know who you are but I don't know WHO you are!")
+				e.sendPrompt(req)
+				return false
+			}
+			actor.Player = player
+			req.Actor = actor
+
+			req.Write("Login successful\n")
+			req.Actor.Player.LoginState = LoginStateLoggedIn
 			e.sendPrompt(req)
+			return true
 		}
 	}
 	return false
@@ -235,7 +247,7 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 		zoneIds[req.Actor.Zone.Id] = true
 	}
 	// Now save any zones in which actions have occurred
-	for zid, _ := range zoneIds {
+	for zid := range zoneIds {
 		zone, err := e.zoneMgr.GetZone(zid)
 		if err != nil {
 			panic(fmt.Sprintf("WTF, no zone %s", zid))

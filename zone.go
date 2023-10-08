@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 	"gopkg.in/yaml.v3"
@@ -120,7 +122,7 @@ func (z *Zone) loadZoneState() {
 	}
 }
 
-func NewZone(id Id) (*Zone, error) {
+func LoadZone(id Id) (*Zone, error) {
 	log.Printf("Loading zone %s", id)
 	zone := &Zone{
 		Id:     id,
@@ -182,23 +184,55 @@ type ZoneManager struct {
 	zones map[Id]*Zone
 }
 
-func GetZoneMgr() *ZoneManager {
-	return &ZoneManager{
-		zones: make(map[Id]*Zone),
+func GetZoneMgr() (*ZoneManager, error) {
+	zones, err := loadZones()
+	if err != nil {
+		return nil, err
 	}
+	return &ZoneManager{
+		zones: zones,
+	}, nil
 }
 
 func (zm *ZoneManager) GetZone(id Id) (*Zone, error) {
 	z := zm.zones[id]
-	// TODO: lazy loading kind of sucks since we can't handle panics well.
-	// If we have corrupt world data we probably shouldn't even start up.
 	if z == nil {
-		var err error
-		z, err = NewZone(id)
-		if err != nil {
-			return nil, err
-		}
-		zm.zones[id] = z
+		return nil, fmt.Errorf("Unable to find zone %s", id)
 	}
 	return z, nil
+}
+
+func loadZones() (map[Id]*Zone, error) {
+	zones := make(map[Id]*Zone, 0)
+	entries, err := os.ReadDir("world")
+	if err != nil {
+		return nil, fmt.Errorf("Could not access world directory: %s", err)
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		// any file in the world directory with a number for a name and .dat suffix is a zone
+		isZone, _ := regexp.MatchString(`\d+\.dat`, name)
+		if isZone {
+			id, _ := strings.CutSuffix(name, ".dat")
+			z, err := LoadZone(Id(id))
+			if err != nil {
+				return nil, fmt.Errorf("Error loading zones: %s", err)
+			}
+			zones[z.Id] = z
+		}
+	}
+	return zones, nil
+}
+
+func (zm *ZoneManager) FindActor(actorId Id) (*Actor, error) {
+	for _, zone := range zm.zones {
+		// TODO: create a global actor list in zonemgr when zones are loaded
+		for _, actor := range zone.Actors {
+			if actor.Id == actorId {
+				return actor, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("Actor '%s' cannot be found!", actorId)
 }

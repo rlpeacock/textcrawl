@@ -6,7 +6,8 @@ import (
 
 func DoCommand(text string) *Command {
 	a := NewActor("1", NewPlayer())
-	zone, _ := GetZoneMgr().GetZone("1")
+	zm, _ := GetZoneMgr()
+	zone, _ := zm.GetZone("1")
 	room := zone.Rooms["R1"]
 	cmd := NewCommand(text)
 	cmd.ResolveWords(room, a)

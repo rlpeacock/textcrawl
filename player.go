@@ -39,27 +39,30 @@ func NewPlayerMgr() *PlayerMgr {
 
 // hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
-func (pm *PlayerMgr) LookupPlayer(username string, pwd string) (*Player, int, error) {
+func (pm *PlayerMgr) LookupPlayer(username string, pwd string) (*Player, Id, error) {
 	rows, err := pm.db.Query(`
 SELECT password, actor_id, active FROM player WHERE username = ?`, username)
 	if err != nil {
-		return nil, 0, err
+		return nil, "", err
 	}
 	if rows.Next() {
 		var (
 			storedPwd string
 			active    bool
-			actorId   int
+			actorId   string
 		)
 		rows.Scan(&storedPwd, &actorId, &active)
-		err = bcrypt.CompareHashAndPassword([]byte(storedPwd), []byte(pwd))
-		if err != nil {
-			return nil, 0, errors.New("Invalid username or password")
+		// TODO: don't check passwords...we can't write them to DB yet!
+		if pwd != "" {
+			err = bcrypt.CompareHashAndPassword([]byte(storedPwd), []byte(pwd))
+			if err != nil {
+				return nil, "", errors.New("Invalid username or password")
+			}
 		}
 		if active {
-			return nil, 0, errors.New("User is already logged in")
+			return nil, "", errors.New("User is already logged in")
 		}
-		return &Player{Username: username, LoginState: LoginStateStart}, actorId, nil
+		return &Player{Username: username, LoginState: LoginStateStart}, Id(actorId), nil
 	}
-	return nil, 0, errors.New("Invalid username or password")
+	return nil, "", errors.New("Invalid username or password")
 }

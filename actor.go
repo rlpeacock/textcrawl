@@ -204,7 +204,7 @@ func (a *Actor) Save(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	if ! a.dirty {
+	if !a.dirty {
 		return nil
 	}
 	stats := a.Stats
