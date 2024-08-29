@@ -5,10 +5,9 @@ import (
 	"io"
 	"log"
 	"os"
+	cmd "rob.co/textcrawl/command"
+	entity "rob.co/textcrawl/entity"
 	"time"
-
-	lua "github.com/yuin/gopher-lua"
-	luar "layeh.com/gopher-luar"
 )
 
 // each connection, when it receives a message, will put it on a channel
@@ -30,10 +29,10 @@ const LuaEntrypoint = "lib/commands.lua"
 type Message struct {
 	mType  MessageType
 	Writer io.Writer
-	Actor  *Actor
+	Actor  *entity.Actor
 }
 
-func NewMessage(t MessageType, a *Actor, w io.Writer) Message {
+func NewMessage(t MessageType, a *entity.Actor, w io.Writer) Message {
 	return Message{
 		mType:  t,
 		Actor:  a,
@@ -43,8 +42,8 @@ func NewMessage(t MessageType, a *Actor, w io.Writer) Message {
 
 type Request struct {
 	Writer io.Writer
-	Cmd    *Command
-	Actor  *Actor
+	Cmd    *cmd.Command
+	Actor  *entity.Actor
 }
 
 func (r *Request) Write(msg string) {
@@ -52,7 +51,7 @@ func (r *Request) Write(msg string) {
 	_, _ = r.Writer.Write([]byte(msg))
 }
 
-func NewRequest(actor *Actor, writer io.Writer, cmd *Command) *Request {
+func NewRequest(actor *entity.Actor, writer io.Writer, cmd *cmd.Command) *Request {
 	return &Request{
 		Actor:  actor,
 		Writer: writer,
@@ -76,19 +75,14 @@ type Engine struct {
 	RequestCh   chan *Request
 	HeartbeatCh chan *Heartbeat
 	MessageCh   chan Message
-	reqsByActor map[Id][]*Request
-	playerMgr   *PlayerMgr
-	zoneMgr     *ZoneManager
-	luaState    *lua.LState
+	reqsByActor map[entity.Id][]*Request
+	playerMgr   *entity.PlayerMgr
+	zoneMgr     *entity.ZoneManager
 	loadTime    time.Time
 }
 
 func NewEngine() *Engine {
-	ls := lua.NewState()
-	if err := ls.DoFile(LuaEntrypoint); err != nil {
-		panic(fmt.Sprintf("Script execution failed: %s", err))
-	}
-	zm, err := GetZoneMgr()
+	zm, err := entity.GetZoneMgr()
 	if err != nil {
 		log.Fatalf("Unable to start engine: %s", err)
 	}
@@ -97,28 +91,27 @@ func NewEngine() *Engine {
 		RequestCh:   make(chan *Request),
 		HeartbeatCh: make(chan *Heartbeat),
 		MessageCh:   make(chan Message),
-		reqsByActor: make(map[Id][]*Request),
-		playerMgr:   NewPlayerMgr(),
+		reqsByActor: make(map[entity.Id][]*Request),
+		playerMgr:   entity.NewPlayerMgr(),
 		zoneMgr:     zm,
-		luaState:    ls,
 		loadTime:    time.Now(),
 	}
 }
 
 func (e *Engine) ensureLoggedIn(req *Request) bool {
 	switch req.Actor.Player.LoginState {
-	case LoginStateLoggedIn:
+	case entity.LoginStateLoggedIn:
 		return true
-	case LoginStateStart:
-		req.Actor.Player.LoginState = LoginStateWantUser
+	case entity.LoginStateStart:
+		req.Actor.Player.LoginState = entity.LoginStateWantUser
 		req.Write("Please enter your username: ")
-	case LoginStateWantUser:
+	case entity.LoginStateWantUser:
 		if req.Cmd.Text != "" {
 			req.Actor.Player.Username = req.Cmd.Text
-			req.Actor.Player.LoginState = LoginStateWantPwd
+			req.Actor.Player.LoginState = entity.LoginStateWantPwd
 			req.Write("Please enter your password: ")
 		}
-	case LoginStateWantPwd:
+	case entity.LoginStateWantPwd:
 		if req.Cmd.Text != "" {
 			// TODO: for now, we don't actually have passwords!
 			player, actorId, err := e.playerMgr.LookupPlayer(req.Actor.Player.Username, "")
@@ -139,7 +132,7 @@ func (e *Engine) ensureLoggedIn(req *Request) bool {
 			req.Actor = actor
 
 			req.Write("Login successful\n")
-			req.Actor.Player.LoginState = LoginStateLoggedIn
+			req.Actor.Player.LoginState = entity.LoginStateLoggedIn
 			e.sendPrompt(req)
 			return true
 		}
@@ -156,19 +149,6 @@ func (e *Engine) dispatch(req *Request) {
 	req.Cmd.ResolveWords(req.Actor.Room(), req.Actor)
 	if req.Cmd.Action == "" {
 		return
-	}
-	args := []lua.LValue{luar.New(e.luaState, req)}
-	for _, a := range req.Cmd.Params {
-		args = append(args, luar.New(e.luaState, a))
-	}
-	err := e.luaState.CallByParam(lua.P{
-		Fn:      e.luaState.GetGlobal(req.Cmd.Action),
-		NRet:    1,
-		Protect: true,
-	}, args...)
-	if err != nil {
-		log.Printf("Script did not succed: %s", err)
-		req.Write(fmt.Sprintf("We failed to %s\n", req.Cmd.Action))
 	}
 	e.sendPrompt(req)
 }
@@ -204,7 +184,7 @@ func (e *Engine) Run() {
 				log.Printf("INFO: %s has connected", msg.Actor.Id)
 				e.reqsByActor[msg.Actor.Id] = []*Request{}
 				// For a new connection, kick the login flow so the user gets a prompt
-				e.ensureLoggedIn(NewRequest(msg.Actor, msg.Writer, NewCommand("")))
+				e.ensureLoggedIn(NewRequest(msg.Actor, msg.Writer, cmd.NewCommand("")))
 			case Disconnect:
 				log.Printf("INFO: %s has disconnected", msg.Actor.Id)
 				delete(e.reqsByActor, msg.Actor.Id)
@@ -223,27 +203,13 @@ func (e *Engine) processRequests(hb *Heartbeat) {
 			e.reqsByActor[id] = q[1:]
 		}
 	}
-	// check whether we need to reload the lua engine
-	info, err := os.Stat(LuaEntrypoint)
-	if err != nil {
-		panic("What happened to our lua library!")
-	}
-	if info.ModTime().After(e.loadTime) {
-		ls := lua.NewState()
-		err := ls.DoFile(LuaEntrypoint)
-		if err == nil {
-			e.luaState.Close()
-			e.luaState = ls
-		} else {
-			log.Printf("Unable to reload lua engine: %s", err)
-		}
-	}
 	// Go through and handle each request. TODO: we should order these
 	// by init value and account for multi-tick actions.
-	zoneIds := make(map[Id]bool)
+	zoneIds := make(map[entity.Id]bool)
 	for _, req := range todo {
 		log.Print(fmt.Sprintf("processing: %s (%d)\r\n", req.Cmd.Action, hb.tick))
-		e.dispatch(req)
+		cmd.Perform(req.Cmd, req.Actor, req.Writer)
+		e.sendPrompt(req)
 		zoneIds[req.Actor.Zone.Id] = true
 	}
 	// Now save any zones in which actions have occurred

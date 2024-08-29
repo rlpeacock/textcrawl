@@ -1,6 +1,9 @@
-package main
+package command
 
 import (
+	"io"
+	"log"
+	entity "rob.co/textcrawl/entity"
 	"strings"
 )
 
@@ -20,6 +23,12 @@ type Command struct {
 	Preposition  string
 	DirectObjs   []Noun
 	IndirectObjs []Noun
+}
+
+type Action func(cmd *Command) (bool, error)
+
+var dispatchTable = map[string][]Action{
+	"goDirection": {goDirection},
 }
 
 var translations = map[string][]string{
@@ -84,7 +93,7 @@ func TranslateAction(text string) (string, []string) {
 	return t[0], t[1:]
 }
 
-func (c *Command) ResolveWords(room *Room, actor *Actor) {
+func (c *Command) ResolveWords(room *entity.Room, actor *entity.Actor) {
 	words := strings.Split(c.Text, " ")
 	c.Action, c.Params = TranslateAction(words[0])
 words:
@@ -112,4 +121,24 @@ words:
 			c.IndirectObjs = append(c.IndirectObjs, NewNoun(w, entity))
 		}
 	}
+}
+
+func Perform(cmd *Command, actor *entity.Actor, writer io.Writer) {
+	cmd.ResolveWords(actor.Room(), actor)
+	// basically means blank line
+	if cmd.Action == "" {
+		return
+	}
+	handlers := dispatchTable[cmd.Action]
+	for _, h := range handlers {
+		done, err := h(cmd)
+		if done {
+			break
+		}
+		if err != nil {
+			log.Printf("%s", err)
+			// TODO: break?
+		}
+	}
+
 }

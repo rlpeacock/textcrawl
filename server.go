@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net"
+	cmd "rob.co/textcrawl/command"
+	entity "rob.co/textcrawl/entity"
 )
 
 type Server struct {
@@ -40,7 +42,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 	// TODO: for now using IP address, not sure what should really be done
 	// Note that the new actor will not be placed anywhere until completing
 	// login flow.
-	actor := NewActor(conn.RemoteAddr().String(), NewPlayer())
+	actor := entity.NewActor(conn.RemoteAddr().String(), entity.NewPlayer())
 	// Tell the engine we've got somebody joining
 	s.msgChan <- NewMessage(Connect, actor, conn)
 	// Loop forever, processing input from the user. Break if the
@@ -54,7 +56,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 			break
 		}
 		text := string(b[:n])
-		cmd := NewCommand(text)
+		cmd := cmd.NewCommand(text)
 		req := NewRequest(actor, conn, cmd)
 		s.reqChan <- req
 	}
