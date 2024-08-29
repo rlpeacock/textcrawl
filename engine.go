@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	cmd "rob.co/textcrawl/command"
 	entity "rob.co/textcrawl/entity"
 	"time"

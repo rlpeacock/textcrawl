@@ -33,9 +33,9 @@ func (z *Zone) GetRoom(id Id) *Room {
 	return z.Rooms[id]
 }
 
-func loadRooms(id Id) map[Id]*Room {
+func loadRooms(worldDir string, id Id) map[Id]*Room {
 	rooms := make(map[Id]*Room)
-	filename := filepath.Join("world", fmt.Sprintf("%s.yaml", id))
+	filename := filepath.Join(worldDir, fmt.Sprintf("%s.yaml", id))
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to read zone file for zone %s: %s", id, err))
@@ -57,7 +57,7 @@ func loadRooms(id Id) map[Id]*Room {
 	return nodes
 }
 
-func ensureZoneDB(destFile string) {
+func ensureZoneDB(worldDir, destFile string) {
 	if info, err := os.Stat(destFile); err != nil {
 		newFile, err := os.Create(destFile)
 		if err != nil {
@@ -69,7 +69,7 @@ func ensureZoneDB(destFile string) {
 				panic(fmt.Sprintf("Failed to close the db file %s: %s", destFile, err))
 			}
 		}(newFile)
-		template, err := os.Open("world/0.dat")
+		template, err := os.Open(filepath.Join(worldDir, "0.dat"))
 		if err != nil {
 			panic(fmt.Sprintf("Could not find template file for creating new zone: %s", err))
 		}
@@ -90,9 +90,9 @@ func ensureZoneDB(destFile string) {
 	}
 }
 
-func (z *Zone) loadZoneState() {
-	f := filepath.Join("world", fmt.Sprintf("%s.dat", z.Id))
-	ensureZoneDB(f)
+func (z *Zone) loadZoneState(worldDir string) {
+	f := filepath.Join(worldDir, fmt.Sprintf("%s.dat", z.Id))
+	ensureZoneDB(worldDir, f)
 	db, err := sql.Open("sqlite3", f)
 	if err != nil {
 		panic(fmt.Sprintf("Could not open database %s", f))
@@ -122,14 +122,14 @@ func (z *Zone) loadZoneState() {
 	}
 }
 
-func LoadZone(id Id) (*Zone, error) {
+func LoadZone(worldDir string, id Id) (*Zone, error) {
 	log.Printf("Loading zone %s", id)
 	zone := &Zone{
 		Id:     id,
-		Rooms:  loadRooms(id),
+		Rooms:  loadRooms(worldDir, id),
 		Actors: make(map[Id]*Actor),
 	}
-	zone.loadZoneState()
+	zone.loadZoneState(worldDir)
 	return zone, nil
 }
 
@@ -204,18 +204,19 @@ func (zm *ZoneManager) GetZone(id Id) (*Zone, error) {
 
 func loadZones() (map[Id]*Zone, error) {
 	zones := make(map[Id]*Zone, 0)
-	entries, err := os.ReadDir("world")
+	worldDir := os.Getenv("TEXTCRAWL_WORLD")
+	entries, err := os.ReadDir(worldDir)
 	if err != nil {
 		return nil, fmt.Errorf("Could not access world directory: %s", err)
 	}
 
 	for _, entry := range entries {
 		name := entry.Name()
-		// any file in the world directory with a number for a name and .dat suffix is a zone
-		isZone, _ := regexp.MatchString(`\d+\.dat`, name)
+		// any file in the world directory with a number for a name and .yaml suffix is a zone
+		isZone, _ := regexp.MatchString(`\d+\.yaml`, name)
 		if isZone {
-			id, _ := strings.CutSuffix(name, ".dat")
-			z, err := LoadZone(Id(id))
+			id, _ := strings.CutSuffix(name, ".yaml")
+			z, err := LoadZone(worldDir, Id(id))
 			if err != nil {
 				return nil, fmt.Errorf("Error loading zones: %s", err)
 			}
