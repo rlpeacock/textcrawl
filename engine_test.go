@@ -9,7 +9,7 @@ import (
 )
 
 type testSession struct {
-	req    *Request
+	req    Request
 	reader io.Reader
 	ch     chan string
 	e      *Engine

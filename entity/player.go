@@ -22,24 +22,28 @@ func NewPlayer() *Player {
 	}
 }
 
-type PlayerMgr struct {
+type PlayerMgr interface {
+	LookupPlayer(username string, pwd string) (*Player, Id, error)
+}
+
+type DBPlayerMgr struct {
 	db *sql.DB
 }
 
-func NewPlayerMgr() *PlayerMgr {
+func NewPlayerMgr() PlayerMgr {
 	f := filepath.Join("world", "player.dat")
 	db, err := sql.Open("sqlite3", f)
 	if err != nil {
 		panic(fmt.Sprintf("Could not open database %s", f))
 	}
-	return &PlayerMgr{
+	return DBPlayerMgr{
 		db: db,
 	}
 }
 
 // hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
-func (pm *PlayerMgr) LookupPlayer(username string, pwd string) (*Player, Id, error) {
+func (pm DBPlayerMgr) LookupPlayer(username string, pwd string) (*Player, Id, error) {
 	rows, err := pm.db.Query(`
 SELECT password, actor_id, active FROM player WHERE username = ?`, username)
 	if err != nil {

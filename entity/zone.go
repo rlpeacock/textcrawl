@@ -184,12 +184,14 @@ type ZoneManager struct {
 	zones map[Id]*Zone
 }
 
-func GetZoneMgr() (*ZoneManager, error) {
+func GetZoneMgr() (ZoneManager, error) {
 	zones, err := loadZones()
 	if err != nil {
-		return nil, err
+		return ZoneManager{
+			zones: map[Id]*Zone{},
+		}, err
 	}
-	return &ZoneManager{
+	return ZoneManager{
 		zones: zones,
 	}, nil
 }

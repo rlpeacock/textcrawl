@@ -43,7 +43,7 @@ type Stats struct {
 type Actor struct {
 	Id     Id
 	Body   *Thing  // The physical presence of the actor within the game
-	Stats  *Stats  //
+	Stats  Stats  //
 	Zone   *Zone   // The current zone for this actor, if any
 	Player *Player // The player, if any, associated with this actor
 	dirty  bool    // whether the actor has been modified from initial state
@@ -189,7 +189,7 @@ func LoadActors(db *sql.DB, things map[Id]*Thing) map[Id]*Actor {
 			log.Printf("WARN: error loading actors %s: %s", actor.Id, err)
 			continue
 		}
-		actor.Stats = &stats
+		actor.Stats = stats
 		actors[actor.Id] = &actor
 	}
 	err = rows.Err()

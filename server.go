@@ -9,11 +9,11 @@ import (
 
 type Server struct {
 	msgChan chan Message
-	reqChan chan *Request
+	reqChan chan Request
 	conns   []net.Conn
 }
 
-func NewServer(msgChan chan Message, reqChan chan *Request) *Server {
+func NewServer(msgChan chan Message, reqChan chan Request) *Server {
 	return &Server{
 		msgChan: msgChan,
 		reqChan: reqChan,
