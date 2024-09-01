@@ -28,13 +28,13 @@ const LuaEntrypoint = "lib/commands.lua"
 type Message struct {
 	mType  MessageType
 	Writer io.Writer
-	Player  entity.Player
+	Player entity.Player
 }
 
 func NewMessage(t MessageType, p entity.Player, w io.Writer) Message {
 	return Message{
 		mType:  t,
-		Player:  p,
+		Player: p,
 		Writer: w,
 	}
 }
@@ -42,7 +42,7 @@ func NewMessage(t MessageType, p entity.Player, w io.Writer) Message {
 type Request struct {
 	Writer io.Writer
 	Text   string
-	Player  entity.Player
+	Player entity.Player
 }
 
 func (r Request) Write(msg string) {
@@ -52,9 +52,9 @@ func (r Request) Write(msg string) {
 
 func NewRequest(player entity.Player, writer io.Writer, rawCmd string) Request {
 	return Request{
-		Player:  player,
+		Player: player,
 		Writer: writer,
-		Text:    rawCmd,
+		Text:   rawCmd,
 	}
 }
 
@@ -96,8 +96,6 @@ func NewEngine() *Engine {
 		loadTime:    time.Now(),
 	}
 }
-
-
 
 func (e *Engine) sendPrompt(req Request) {
 	// this will eventually have status in it
@@ -161,12 +159,11 @@ func (e *Engine) processRequests(hb Heartbeat) {
 	// Go through and handle each request. TODO: we should order these
 	// by init value and account for multi-tick actions.
 
-
 	zoneIds := make(map[entity.Id]bool)
 	for _, req := range todo {
 		a, err := e.zoneMgr.FindActor(req.Player.ActorId)
 		if err != nil {
-			log.Printf("We are receiving commmands from unknown actor '%s'. Command was '%s'", 
+			log.Printf("We are receiving commmands from unknown actor '%s'. Command was '%s'",
 				req.Player.ActorId, req.Text)
 			continue
 		}

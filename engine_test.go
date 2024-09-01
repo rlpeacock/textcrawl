@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"io"
-	"testing"
 	entity "rob.co/textcrawl/entity"
+	"testing"
 )
 
 type DummyPlayerMgr struct {
@@ -25,9 +25,9 @@ type testSession struct {
 	writer io.Writer
 	reader io.Reader
 	ch     chan string
-	engine      *Engine
+	engine *Engine
 	t      *testing.T
-	actor *entity.Actor
+	actor  *entity.Actor
 }
 
 func newTestSession(e *Engine, t *testing.T) *testSession {
@@ -39,9 +39,9 @@ func newTestSession(e *Engine, t *testing.T) *testSession {
 		writer: w,
 		reader: r,
 		ch:     make(chan string),
-		engine:      e,
+		engine: e,
 		t:      t,
-		actor: a,
+		actor:  a,
 	}
 	go ts.readResponses()
 	return ts
@@ -67,5 +67,3 @@ func (t *testSession) sendRequest(text string) {
 func (t *testSession) getResponse() string {
 	return <-t.ch
 }
-
-

@@ -7,17 +7,17 @@ import (
 )
 
 type Server struct {
-	msgChan chan Message
-	reqChan chan Request
-	conns   []net.Conn
+	msgChan   chan Message
+	reqChan   chan Request
+	conns     []net.Conn
 	playerMgr entity.PlayerMgr
 }
 
 func NewServer(msgChan chan Message, reqChan chan Request, playerMgr entity.PlayerMgr) *Server {
 	return &Server{
-		msgChan: msgChan,
-		reqChan: reqChan,
-		conns:   make([]net.Conn, 0),
+		msgChan:   msgChan,
+		reqChan:   reqChan,
+		conns:     make([]net.Conn, 0),
 		playerMgr: playerMgr,
 	}
 }
@@ -70,7 +70,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 				req.Text = ""
 				s.reqChan <- req
 			}
-			
+
 		}
 	}
 }
