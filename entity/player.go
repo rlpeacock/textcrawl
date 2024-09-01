@@ -1,4 +1,4 @@
-package main
+package entity
 
 import (
 	"database/sql"
@@ -14,36 +14,41 @@ type Player struct {
 	LoginState    LoginState
 	LoginAttempts int
 	Username      string
+	ActorId	  Id
 }
 
-func NewPlayer() *Player {
-	return &Player{
+func NewPlayer() Player {
+	return Player{
 		LoginState: LoginStateStart,
 	}
 }
 
-type PlayerMgr struct {
+type PlayerMgr interface {
+	LookupPlayer(username string, pwd string) (Id, error)
+}
+
+type DBPlayerMgr struct {
 	db *sql.DB
 }
 
-func NewPlayerMgr() *PlayerMgr {
+func NewPlayerMgr() PlayerMgr {
 	f := filepath.Join("world", "player.dat")
 	db, err := sql.Open("sqlite3", f)
 	if err != nil {
 		panic(fmt.Sprintf("Could not open database %s", f))
 	}
-	return &PlayerMgr{
+	return DBPlayerMgr{
 		db: db,
 	}
 }
 
 // hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
-func (pm *PlayerMgr) LookupPlayer(username string, pwd string) (*Player, Id, error) {
+func (pm DBPlayerMgr) LookupPlayer(username string, pwd string) (Id, error) {
 	rows, err := pm.db.Query(`
 SELECT password, actor_id, active FROM player WHERE username = ?`, username)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 	if rows.Next() {
 		var (
@@ -56,13 +61,13 @@ SELECT password, actor_id, active FROM player WHERE username = ?`, username)
 		if pwd != "" {
 			err = bcrypt.CompareHashAndPassword([]byte(storedPwd), []byte(pwd))
 			if err != nil {
-				return nil, "", errors.New("Invalid username or password")
+				return "", errors.New("Invalid username or password")
 			}
 		}
 		if active {
-			return nil, "", errors.New("User is already logged in")
+			return "", errors.New("User is already logged in")
 		}
-		return &Player{Username: username, LoginState: LoginStateStart}, Id(actorId), nil
+		return Id(actorId), nil
 	}
-	return nil, "", errors.New("Invalid username or password")
+	return "", errors.New("Invalid username or password")
 }

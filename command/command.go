@@ -1,6 +1,9 @@
-package main
+package command
 
 import (
+	"io"
+	"log"
+	entity "rob.co/textcrawl/entity"
 	"strings"
 )
 
@@ -20,6 +23,14 @@ type Command struct {
 	Preposition  string
 	DirectObjs   []Noun
 	IndirectObjs []Noun
+	Actor        *entity.Actor
+	Room         *entity.Room
+}
+
+type Action func(cmd Command, writer io.Writer) (bool, error)
+
+var dispatchTable = map[string][]Action{
+	"goDirection": {goDirection},
 }
 
 var translations = map[string][]string{
@@ -66,13 +77,17 @@ var prepositions = []string{
 	"under",
 }
 
-func NewCommand(text string) *Command {
-	return &Command{
+func NewCommand(text string, actor *entity.Actor, room *entity.Room) Command {
+	cmd := Command{
 		Text:         strings.TrimSpace(text),
 		Preposition:  "",
 		DirectObjs:   make([]Noun, 0),
 		IndirectObjs: make([]Noun, 0),
+		Actor:        actor,
+		Room:         room,
 	}
+	cmd.resolveWords()
+	return cmd
 }
 
 // look for abbreviations and other mappings
@@ -84,15 +99,15 @@ func TranslateAction(text string) (string, []string) {
 	return t[0], t[1:]
 }
 
-func (c *Command) ResolveWords(room *Room, actor *Actor) {
+func (c *Command) resolveWords() {
 	words := strings.Split(c.Text, " ")
 	c.Action, c.Params = TranslateAction(words[0])
 words:
 	for _, w := range words[1:] {
-		entity := room.Find(w)
+		entity := c.Room.Find(w)
 		// if not in room, check actor's inventory
 		if entity == nil {
-			entity = actor.Find(w)
+			entity = c.Actor.Find(w)
 		}
 		// if not a noun, maybe a preposition?
 		if entity == nil && c.Preposition == "" && len(c.DirectObjs) > 0 {
@@ -112,4 +127,23 @@ words:
 			c.IndirectObjs = append(c.IndirectObjs, NewNoun(w, entity))
 		}
 	}
+}
+
+func Perform(cmd Command, writer io.Writer) {
+	// basically means blank line
+	if cmd.Action == "" {
+		return
+	}
+	handlers := dispatchTable[cmd.Action]
+	for _, h := range handlers {
+		done, err := h(cmd, writer)
+		if done {
+			break
+		}
+		if err != nil {
+			log.Printf("%s", err)
+			// TODO: break?
+		}
+	}
+
 }
