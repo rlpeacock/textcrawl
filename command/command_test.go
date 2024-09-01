@@ -6,13 +6,13 @@ import (
 
 )
 
-func DoCommand(text string) *Command {
+func DoCommand(text string) Command {
 	a := entity.NewActor("1", entity.NewPlayer())
 	zm, _ := entity.GetZoneMgr()
 	zone, _ := zm.GetZone("1")
 	room := zone.Rooms["R1"]
-	cmd := NewCommand(text)
-	cmd.ResolveWords(room, a)
+	room.InsertActor(a)
+	cmd := NewCommand(text, a, room)
 	return cmd
 }
 

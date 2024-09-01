@@ -45,12 +45,12 @@ type Actor struct {
 	Body   *Thing  // The physical presence of the actor within the game
 	Stats  Stats  //
 	Zone   *Zone   // The current zone for this actor, if any
-	Player *Player // The player, if any, associated with this actor
+	Player Player // The player, if any, associated with this actor
 	dirty  bool    // whether the actor has been modified from initial state
 }
 
 // NewActor Returns a generic actor
-func NewActor(id string, player *Player) *Actor {
+func NewActor(id string, player Player) *Actor {
 	return &Actor{
 		Id:     Id(id),
 		Player: player,

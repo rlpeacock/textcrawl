@@ -28,21 +28,21 @@ const LuaEntrypoint = "lib/commands.lua"
 type Message struct {
 	mType  MessageType
 	Writer io.Writer
-	Actor  *entity.Actor
+	Player  entity.Player
 }
 
-func NewMessage(t MessageType, a *entity.Actor, w io.Writer) Message {
+func NewMessage(t MessageType, p entity.Player, w io.Writer) Message {
 	return Message{
 		mType:  t,
-		Actor:  a,
+		Player:  p,
 		Writer: w,
 	}
 }
 
 type Request struct {
 	Writer io.Writer
-	Cmd    *cmd.Command
-	Actor  *entity.Actor
+	Text   string
+	Player  entity.Player
 }
 
 func (r Request) Write(msg string) {
@@ -50,11 +50,11 @@ func (r Request) Write(msg string) {
 	_, _ = r.Writer.Write([]byte(msg))
 }
 
-func NewRequest(actor *entity.Actor, writer io.Writer, cmd *cmd.Command) Request {
+func NewRequest(player entity.Player, writer io.Writer, rawCmd string) Request {
 	return Request{
-		Actor:  actor,
+		Player:  player,
 		Writer: writer,
-		Cmd:    cmd,
+		Text:    rawCmd,
 	}
 }
 
@@ -97,56 +97,17 @@ func NewEngine() *Engine {
 	}
 }
 
-func (e *Engine) ensureLoggedIn(req Request) bool {
-	switch req.Actor.Player.LoginState {
-	case entity.LoginStateLoggedIn:
-		return true
-	case entity.LoginStateStart:
-		req.Actor.Player.LoginState = entity.LoginStateWantUser
-		req.Write("Please enter your username: ")
-	case entity.LoginStateWantUser:
-		if req.Cmd.Text != "" {
-			req.Actor.Player.Username = req.Cmd.Text
-			req.Actor.Player.LoginState = entity.LoginStateWantPwd
-			req.Write("Please enter your password: ")
-		}
-	case entity.LoginStateWantPwd:
-		if req.Cmd.Text != "" {
-			// TODO: for now, we don't actually have passwords!
-			player, actorId, err := e.playerMgr.LookupPlayer(req.Actor.Player.Username, "")
-			if err != nil {
-				log.Printf("Player lookup failed: %s", err)
-				req.Write("I'm sorry...who?")
-				e.sendPrompt(req)
-				return false
-			}
-			actor, err := e.zoneMgr.FindActor(actorId)
-			if err != nil {
-				log.Printf("Player actor lookup failed: %s", err)
-				req.Write("I know who you are but I don't know WHO you are!")
-				e.sendPrompt(req)
-				return false
-			}
-			actor.Player = player
-			req.Actor = actor
 
-			req.Write("Login successful\n")
-			req.Actor.Player.LoginState = entity.LoginStateLoggedIn
-			e.sendPrompt(req)
-			return true
-		}
-	}
-	return false
-}
 
 func (e *Engine) sendPrompt(req Request) {
 	// this will eventually have status in it
 	req.Write("\n> ")
 }
 
-func (e *Engine) dispatch(req Request) {
-	req.Cmd.ResolveWords(req.Actor.Room(), req.Actor)
-	if req.Cmd.Action == "" {
+func (e *Engine) dispatch(req Request, cmd cmd.Command, actor *entity.Actor) {
+	// TODO: this should be done earlier
+	//cmd.ResolveWords(actor.Room(), actor)
+	if cmd.Action == "" {
 		return
 	}
 	e.sendPrompt(req)
@@ -160,18 +121,15 @@ func (e *Engine) Run() {
 	for {
 		select {
 		case req := <-e.RequestCh:
-			if !e.ensureLoggedIn(req) {
-				break
-			}
-			q := e.reqsByActor[req.Actor.Id]
+			q := e.reqsByActor[req.Player.ActorId]
 			if q == nil {
 				// Should have been created connect message, but just to be safe...
-				log.Printf("WARN: Request queue missing for actor %s", req.Actor.Id)
+				log.Printf("WARN: Request queue missing for actor %s", req.Player.ActorId)
 				q = []Request{req}
 			} else {
 				q = append(q, req)
 			}
-			e.reqsByActor[req.Actor.Id] = q
+			e.reqsByActor[req.Player.ActorId] = q
 		case hb := <-e.HeartbeatCh:
 			if hb.cmd == "quit" {
 				return
@@ -180,13 +138,11 @@ func (e *Engine) Run() {
 		case msg := <-e.MessageCh:
 			switch msg.mType {
 			case Connect:
-				log.Printf("INFO: %s has connected", msg.Actor.Id)
-				e.reqsByActor[msg.Actor.Id] = []Request{}
-				// For a new connection, kick the login flow so the user gets a prompt
-				e.ensureLoggedIn(NewRequest(msg.Actor, msg.Writer, cmd.NewCommand("")))
+				log.Printf("INFO: %s has connected", msg.Player.ActorId)
+				e.reqsByActor[msg.Player.ActorId] = []Request{}
 			case Disconnect:
-				log.Printf("INFO: %s has disconnected", msg.Actor.Id)
-				delete(e.reqsByActor, msg.Actor.Id)
+				log.Printf("INFO: %s has disconnected", msg.Player.ActorId)
+				delete(e.reqsByActor, msg.Player.ActorId)
 			}
 		}
 	}
@@ -204,12 +160,21 @@ func (e *Engine) processRequests(hb Heartbeat) {
 	}
 	// Go through and handle each request. TODO: we should order these
 	// by init value and account for multi-tick actions.
+
+
 	zoneIds := make(map[entity.Id]bool)
 	for _, req := range todo {
-		log.Print(fmt.Sprintf("processing: %s (%d)\r\n", req.Cmd.Action, hb.tick))
-		cmd.Perform(req.Cmd, req.Actor, req.Writer)
+		a, err := e.zoneMgr.FindActor(req.Player.ActorId)
+		if err != nil {
+			log.Printf("We are receiving commmands from unknown actor '%s'. Command was '%s'", 
+				req.Player.ActorId, req.Text)
+			continue
+		}
+		c := cmd.NewCommand(req.Text, a, a.Room())
+		log.Print(fmt.Sprintf("processing: %s (%d)\r\n", c.Action, hb.tick))
+		cmd.Perform(c, req.Writer)
 		e.sendPrompt(req)
-		zoneIds[req.Actor.Zone.Id] = true
+		zoneIds[a.Zone.Id] = true
 	}
 	// Now save any zones in which actions have occurred
 	for zid := range zoneIds {
@@ -243,7 +208,7 @@ func heartbeat(c chan Heartbeat) {
 func main() {
 	fmt.Println("Starting engine")
 	e := NewEngine()
-	s := NewServer(e.MessageCh, e.RequestCh)
+	s := NewServer(e.MessageCh, e.RequestCh, e.playerMgr)
 	go s.Serve()
 	go heartbeat(e.HeartbeatCh)
 	e.Run()
