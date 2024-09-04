@@ -102,14 +102,6 @@ func (e *Engine) sendPrompt(req Request) {
 	req.Write("\n> ")
 }
 
-func (e *Engine) dispatch(req Request, cmd cmd.Command, actor *entity.Actor) {
-	// TODO: this should be done earlier
-	//cmd.ResolveWords(actor.Room(), actor)
-	if cmd.Action == "" {
-		return
-	}
-	e.sendPrompt(req)
-}
 
 // Run We queue up requests for each actor. When we receive a
 // heartbeat message, we process the events we've received.
@@ -122,7 +114,7 @@ func (e *Engine) Run() {
 			q := e.reqsByActor[req.Player.ActorId]
 			if q == nil {
 				// Should have been created connect message, but just to be safe...
-				log.Printf("WARN: Request queue missing for actor %s", req.Player.ActorId)
+				log.Printf("WARN: Request queue missing for actor '%s'", req.Player.ActorId)
 				q = []Request{req}
 			} else {
 				q = append(q, req)

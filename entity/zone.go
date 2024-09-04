@@ -104,6 +104,7 @@ func (z *Zone) loadZoneState(worldDir string) {
 	// add actors to rooms
 	z.Actors = make(map[Id]*Actor)
 	for _, actor := range actorsById {
+		actor.Zone = z
 		z.Actors[actor.ID()] = actor
 		z.Rooms[actor.Body.ParentId].InsertActor(actor)
 	}

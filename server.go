@@ -139,6 +139,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 					// clear out password and send req on to the engine so that it can issue a prompt
 					s.msgChan <- NewMessage(Connect, player, conn)
 					req.Text = ""
+					req.Player = player
 					s.reqChan <- req
 				}
 
