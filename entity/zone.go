@@ -207,7 +207,10 @@ func (zm *ZoneManager) GetZone(id Id) (*Zone, error) {
 
 func loadZones() (map[Id]*Zone, error) {
 	zones := make(map[Id]*Zone, 0)
-	worldDir := os.Getenv("TEXTCRAWL_WORLD")
+	worldDir, ok := os.LookupEnv("TEXTCRAWL_WORLD")
+	if !ok {
+		worldDir = "./world"
+	}
 	entries, err := os.ReadDir(worldDir)
 	if err != nil {
 		return nil, fmt.Errorf("Could not access world directory: %s", err)
