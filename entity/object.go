@@ -153,6 +153,7 @@ func (t *Thing) Remove(thing *Thing) bool {
 func SerializeAttrib(attrib Attrib) string {
 	return fmt.Sprintf("%d:%d", attrib.Real, attrib.Cur)
 }
+
 func DeserializeAttrib(s string) (Attrib, error) {
 	parts := strings.Split(s, ":")
 	if len(parts) != 2 {
@@ -174,8 +175,9 @@ func SerializeAttribList(attribs ...Attrib) string {
 	for _, attrib := range attribs {
 		serialized = serialized + "," + SerializeAttrib(attrib)
 	}
-	return serialized
+	return serialized[1:] // start from 1 to drop leading comma
 }
+
 func DeserializeAttribList(attribStr string, attribs ...*Attrib) error {
 	rawAttribs := strings.Split(attribStr, ",")
 	if len(rawAttribs) < len(attribs) {

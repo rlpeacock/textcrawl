@@ -22,7 +22,7 @@ func openDB(zone string) (*sql.DB, error) {
 	return db,nil
 }
 
-func TestLoadingActor(t *testing.T) {
+func TestSaveLoadActor(t *testing.T) {
 	db, err := openDB("1")
 	if err != nil {
 		t.Errorf("Unable to open DB: %v", err)
@@ -31,7 +31,17 @@ func TestLoadingActor(t *testing.T) {
 		"T2": &Thing{},
 	}
 	actors := LoadActors(db, things)
-	if actors["A1"] == nil {
-		t.Error(`Actor "foo" not found`)
+	actor := actors["A1"]
+	if actor == nil {
+		t.Error(`Actor "A1" not found`)
 	}
+
+	actor.dirty = true
+	actor.Save(db)
+	actors = LoadActors(db, things)
+	actor = actors["A1"]
+	if actor == nil {
+		t.Error(`Actor could not be loaded after save`)
+	}
+	
 }

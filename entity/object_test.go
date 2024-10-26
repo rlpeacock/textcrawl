@@ -83,3 +83,60 @@ func TestDeserializeAttribList(t *testing.T) {
 		t.Errorf(`DeserializeAttribList("1:2,3:4,5:6", &a, &b, &c) returned a bad real value. Expected, 1,3,5 but got %d,%d,%d`, a.Real, b.Real, c.Real)
 	}
 }
+
+func TestSerializeAttrib(t *testing.T) {
+	a := Attrib{
+		Real:1,
+		Cur:2,
+	}
+	s := SerializeAttrib(a)
+	if s != "1:2" {
+		t.Errorf("attrib should have serlialized to 1:2 but got '%s'", s)
+	}
+}
+
+func TestSerializeAttribList(t *testing.T) {
+	a := []Attrib{
+		Attrib{1,2},
+		Attrib{3,4},
+		Attrib{5,6},
+	}
+	s := SerializeAttribList(a...)
+	if s != "1:2,3:4,5:6" {
+		t.Errorf("attrib list should have serialized to 1:2,3:4,5:6 but got '%s'", s)
+	}	
+}
+
+func TestLoadObjects(t *testing.T) {
+	db, err := openDB("1")
+	if err != nil {
+		t.Errorf("Unable to open DB: %v", err)
+	}
+	things := LoadThings(db)
+	t1 := things["T1"]
+	if t1 == nil {
+		t.Errorf("failed to find T1 in DB")
+	}
+	if t1.Id != "T1" {
+		t.Errorf("expected ID T1 but got '%s'", t1.Id)
+	}
+	if t1.Title != "tin knife" {
+		t.Errorf("expected T1 title to be 'tin knife' but was '%s'", t1.Title)
+	}
+	if t1.Weight.Real != 1 || t1.Weight.Cur != 1 {
+		t.Errorf("T1 weight should be 1:1 but was %d:%d", t1.Weight.Real, t1.Weight.Cur)
+	}
+	if t1.Size.Real != 2 || t1.Size.Cur != 2 {
+		t.Errorf("T1 size should be 2:2 but was %d:%d", t1.Size.Real, t1.Size.Cur)
+	}
+	if t1.Durability.Real != 3 || t1.Durability.Cur != 3 {
+		t.Errorf("T1 durability should be 3:3 but was %d:%d", t1.Durability.Real, t1.Durability.Cur)
+	}
+	t2 := things["T2"]
+	if t2.Id != "T2" {
+		t.Errorf("expected ID T2 but got '%s'", t2.Id)		
+	}
+	if t2.Title != "a man" {
+		t.Errorf("expected T2 title to be 'a man' but was '%s'", t1.Title)		
+	}
+}
