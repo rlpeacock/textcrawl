@@ -7,11 +7,11 @@ import (
 func TestGetZone(t *testing.T) {
 	zm, e := GetZoneMgr()
 	if e != nil {
-		t.Errorf("GetZoneMgr returned an error: %s", e)
+		t.Fatalf("GetZoneMgr returned an error: %s", e)
 	}
 	z, e := zm.GetZone(Id("1"))
 	if e != nil {
-		t.Errorf("GetZoneMgr().GetZone(Id(1)) returned an error: %s", e)
+		t.Fatalf("GetZoneMgr().GetZone(Id(1)) returned an error: %s", e)
 	}
 	loc := z.Rooms[Id("R1")]
 	if loc.Title != "a room" {
