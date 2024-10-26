@@ -28,7 +28,7 @@ func TestSaveLoadActor(t *testing.T) {
 		t.Errorf("Unable to open DB: %v", err)
 	}
 	things := map[Id]*Thing{
-		"T2": &Thing{},
+		"T2": {},
 	}
 	actors := LoadActors(db, things)
 	actor := actors["A1"]

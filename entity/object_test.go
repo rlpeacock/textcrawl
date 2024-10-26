@@ -97,9 +97,9 @@ func TestSerializeAttrib(t *testing.T) {
 
 func TestSerializeAttribList(t *testing.T) {
 	a := []Attrib{
-		Attrib{1,2},
-		Attrib{3,4},
-		Attrib{5,6},
+		{1,2},
+		{3,4},
+		{5,6},
 	}
 	s := SerializeAttribList(a...)
 	if s != "1:2,3:4,5:6" {
